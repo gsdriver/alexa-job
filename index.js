@@ -48,6 +48,7 @@ if (process.env.SETS3) {
   // Get the ranks every 5 minutes and write to S3 if successful
   setInterval(() => {
     roulette.updateRouletteScores();
+    slotmachine.updateSlotMachineScores();
   }, 1000*60*5);
 }
 
@@ -85,3 +86,4 @@ if (process.env.SINGLERUN) {
     });
   });
 }
+
