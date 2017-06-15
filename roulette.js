@@ -166,6 +166,33 @@ module.exports = {
       }
     });
   },
+  closeTournament: function(callback) {
+    getRankFromDB((err, americanScores, europeanScores, tournamentScores) => {
+      if (err) {
+        callback(err);
+      } else {
+        const highScore = (tournamentScores && tournamentScores[0]) ? tournamentScores[0] : 1;
+
+        // Now get the list of completed tournaments to add to
+        s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'RouletteTournamentResults.txt'}, (err, data) => {
+          if (err) {
+            callback(err);
+          } else {
+            const results = JSON.parse(data.Body.toString('ascii'));
+
+            results.unshift({timestamp: Date.now(), highScore: highScore});
+            const params = {Body: JSON.stringify(results),
+              Bucket: 'garrett-alexa-usage',
+              Key: 'RouletteTournamentResults.txt'};
+
+            s3.putObject(params, (err, data) => {
+              callback(err);
+            });
+          }
+        });
+      }
+    });
+  },
 };
 
 // Function to get all the scores from the Database
@@ -261,6 +288,9 @@ function getRankFromDB(callback) {
   })(true, null).then(() => {
     americanScores.sort((a, b) => (b-a));
     europeanScores.sort((a, b) => (b-a));
+    if (tournamentScores) {
+      tournamentScores.sort((a, b) => (b-a));
+    }
     callback(null, americanScores, europeanScores, tournamentScores);
   }).catch((err) => {
     console.log('Error scanning: ' + err);
