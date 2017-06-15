@@ -181,6 +181,7 @@ module.exports = {
             const results = JSON.parse(data.Body.toString('ascii'));
 
             results.push({timestamp: Date.now(), highScore: highScore});
+            results.sort((a, b) => (a.timestamp - b.timestamp));
             const params = {Body: JSON.stringify(results),
               Bucket: 'garrett-alexa-usage',
               Key: 'RouletteTournamentResults.txt'};
