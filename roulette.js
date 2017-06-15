@@ -180,7 +180,7 @@ module.exports = {
           } else {
             const results = JSON.parse(data.Body.toString('ascii'));
 
-            results.unshift({timestamp: Date.now(), highScore: highScore});
+            results.push({timestamp: Date.now(), highScore: highScore});
             const params = {Body: JSON.stringify(results),
               Bucket: 'garrett-alexa-usage',
               Key: 'RouletteTournamentResults.txt'};
