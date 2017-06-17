@@ -271,8 +271,8 @@ function getRankFromDB(callback) {
               scoreData = data.Items[i].mapAttr.M.tournament.M;
               const spins = (scoreData.spins && scoreData.spins.N)
                     ? parseInt(scoreData.spins.N) : 0;
-              const high = (scoreData.high && scoreData.high.N)
-                    ? parseInt(scoreData.high.N) : 0;
+              const high = (scoreData.bankroll && scoreData.bankroll.N)
+                    ? parseInt(scoreData.bankroll.N) : 0;
 
               if (spins) {
                 tournamentScores.push(high);

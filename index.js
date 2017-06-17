@@ -87,3 +87,12 @@ if (process.env.SINGLERUN) {
   });
 }
 
+if (process.env.CLOSETOURNAMENT) {
+  roulette.closeTournament((err) => {
+    if (err) {
+      console.log('Closing error: ' + err);
+    } else {
+      console.log('Closed tournament!');
+    }
+  });
+}
