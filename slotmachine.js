@@ -13,28 +13,39 @@ const utils = require('./utils');
 module.exports = {
   // Generates the text for blackjack e-mail summary
   getSlotsMail: function(callback) {
-    let text;
+    let text = '';
 
     getEntriesFromDB((err, results, newads) => {
       if (err) {
         text = 'Error getting slotmachine data: ' + err;
       } else {
-        let totalSpins = 0;
-        let totalJackpots = 0;
-        let maxSpins = 0;
+        const games = {};
+        let thisGame;
         let i;
 
         for (i = 0; i < results.length; i++) {
-          totalSpins += results[i].spins;
-          totalJackpots += results[i].jackpot;
-          if (results[i].spins > maxSpins) {
-            maxSpins = results[i].spins;
+          if (!games[results[i].game]) {
+            games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0, maxSpins: 0};
+          }
+
+          thisGame = games[results[i].game];
+          thisGame.players++;
+          thisGame.totalSpins += results[i].spins;
+          thisGame.totalJackpots += results[i].jackpot;
+          if (results[i].spins > thisGame.maxSpins) {
+            thisGame.maxSpins = results[i].spins;
           }
         }
 
-        text = 'There are ' + results.length + ' registered players: ';
-        text += ('There have been a total of ' + totalSpins + ' spins and ' + totalJackpots + ' jackpots.\r\n');
-        text += maxSpins + ' is the most spins played by one person.\r\n';
+        let game;
+        for (game in games) {
+          if (game) {
+            text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
+            text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
+            text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
+          }
+        }
+
         text += utils.getAdText(newads);
       }
 
@@ -46,23 +57,34 @@ module.exports = {
       if (!err) {
         const scoreData = {timestamp: Date.now()};
 
-        const scores = [];
+        const scores = {};
 
         results.forEach((score) => {
+          if (!scores[score.game]) {
+            scores[score.game] = [];
+          }
+
           if (score.high) {
-            scores.push(score.high);
+            scores[score.game].push(score.high);
           }
         });
-        scores.sort((a, b) => (b - a));
+
+        let game;
+        for (game in scores) {
+          if (game) {
+            scores[game].sort((a, b) => (b - a));
+          }
+        }
+
         scoreData.scores = scores;
 
         // Let's only write to S3 if these scores have changed
-        checkScoreChange(scoreData, (diff) => {
+        checkScoreChange(scoreData.scores, (diff) => {
           if (diff != 'same') {
             // It's not the same, so try to write it out
             const params = {Body: JSON.stringify(scoreData),
               Bucket: 'garrett-alexa-usage',
-              Key: 'SlotMachineScores.txt'};
+              Key: 'SlotMachineScores2.txt'};
 
             s3.putObject(params, (err, data) => {
               if (err) {
@@ -83,28 +105,36 @@ function getEntriesFromDB(callback) {
 
   // Loop thru to read in all items from the DB
   (function loop(firstRun, startKey) {
-   const params = {TableName: 'Slots'};
+    const params = {TableName: 'Slots'};
 
-   if (firstRun || startKey) {
-     params.ExclusiveStartKey = startKey;
+    if (firstRun || startKey) {
+      params.ExclusiveStartKey = startKey;
 
-     const scanPromise = dynamodb.scan(params).promise();
-     return scanPromise.then((data) => {
-       let i;
+      const scanPromise = dynamodb.scan(params).promise();
+      return scanPromise.then((data) => {
+        let i;
 
-       utils.getAdSummary(data, newads);
-       for (i = 0; i < data.Items.length; i++) {
-        const entry = getEntryForGame(data.Items[i], 'basic');
-        if (entry) {
-          results.push(entry);
+        utils.getAdSummary(data, newads);
+        for (i = 0; i < data.Items.length; i++) {
+          if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
+            let game;
+
+            for (game in data.Items[i].mapAttr.M) {
+              if (game) {
+                const entry = getEntryForGame(data.Items[i], game);
+                if (entry) {
+                  results.push(entry);
+                }
+              }
+            }
+          }
         }
-       }
 
-       if (data.LastEvaluatedKey) {
-         return loop(false, data.LastEvaluatedKey);
-       }
-     });
-   }
+        if (data.LastEvaluatedKey) {
+          return loop(false, data.LastEvaluatedKey);
+        }
+      });
+    }
   })(true, null).then(() => {
     callback(null, results, newads);
   }).catch((err) => {
@@ -117,62 +147,73 @@ function getEntryForGame(item, game) {
 
   if (item.mapAttr && item.mapAttr.M
     && item.mapAttr.M[game] && item.mapAttr.M[game].M) {
-     entry = {};
-
      if (item.mapAttr.M[game].M.spins) {
        const spins = parseInt(item.mapAttr.M[game].M.spins.N);
 
+       entry = {game: game};
        entry.spins = isNaN(spins) ? 0 : spins;
        if (item.mapAttr.M[game].M.high) {
          const high = parseInt(item.mapAttr.M[game].M.high.N);
-
          entry.high = isNaN(high) ? 0 : high;
        }
-     } else {
-       entry.spins = 0;
-     }
 
-     if (item.mapAttr.M[game].M.jackpot) {
-       const jackpot = parseInt(item.mapAttr.M[game].M.jackpot.N);
+      if (item.mapAttr.M[game].M.jackpot) {
+        const jackpot = parseInt(item.mapAttr.M[game].M.jackpot.N);
 
-       entry.jackpot = isNaN(jackpot) ? 0 : jackpot;
-     } else {
-       entry.jackpot = 0;
-     }
-   }
+        entry.jackpot = isNaN(jackpot) ? 0 : jackpot;
+      } else {
+        entry.jackpot = 0;
+      }
+    }
+  }
 
-   return entry;
+  return entry;
 }
 
 function checkScoreChange(newScores, callback) {
   // Read the S3 buckets that has everyone's scores
-  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'SlotMachineScores.txt'}, (err, data) => {
+  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'SlotMachineScores2.txt'}, (err, data) => {
     if (err) {
       console.log(err, err.stack);
       callback('error');
     } else {
       // Get the scores array from the file
-      const scores = JSON.parse(data.Body.toString('ascii'));
-      const oldLength = (scores && scores.scores) ? scores.scores.length : 0;
-      const newLength = (newScores && newScores.scores) ? newScores.scores.length : 0;
+      const currentScoreData = JSON.parse(data.Body.toString('ascii'));
+      let game;
+      let oldLength;
+      let newLength;
+      const scores = (currentScoreData) ? (currentScoreData.scores) : undefined;
 
-      if (oldLength != newLength) {
-        // They are different
-        callback('different');
-      } else {
-        // Check if all alements are the same
-        let i = 0;
-
-        for (i = 0; i < newLength; i++) {
-          if (scores.scores[i] != newScores.scores[i]) {
+      for (game in newScores) {
+        if (game) {
+          if (!scores || !scores[game]) {
             callback('different');
             return;
           }
-        }
 
-        // If we made it this far, we are the same
-        callback('same');
+          oldLength = (scores[game]) ? scores[game].length : 0;
+          newLength = (newScores[game]) ? newScores[game].length : 0;
+
+          if (oldLength != newLength) {
+            // They are different
+            callback('different');
+            return;
+          } else {
+            // Check if all alements are the same
+            let i = 0;
+
+            for (i = 0; i < newLength; i++) {
+              if (scores[game][i] != newScores[game][i]) {
+                callback('different');
+                return;
+              }
+            }
+          }
+        }
       }
+
+      // If we made it this far, we are the same
+      callback('same');
     }
   });
 }
