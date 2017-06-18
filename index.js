@@ -16,7 +16,10 @@ AWS.config.update({
 const SES = new AWS.SES();
 
 function sendEmail(text, callback) {
-  const digestName = (new Date(Date.now()).getHours() < 12)
+  const d = new Date();
+  d.setHours(d.getHours() - 7);
+
+  const digestName = (d.getHours() < 12)
           ? 'Alexa Skill Usage Morning Digest'
           : 'Alexa Skill Usage Evening Digest';
 

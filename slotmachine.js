@@ -20,18 +20,20 @@ module.exports = {
         text = 'Error getting slotmachine data: ' + err;
       } else {
         let totalSpins = 0;
+        let totalJackpots = 0;
         let maxSpins = 0;
         let i;
 
         for (i = 0; i < results.length; i++) {
           totalSpins += results[i].spins;
+          totalJackpots += results[i].jackpot;
           if (results[i].spins > maxSpins) {
             maxSpins = results[i].spins;
           }
         }
 
         text = 'There are ' + results.length + ' registered players: ';
-        text += ('There have been a total of ' + totalSpins + ' spins.\r\n');
+        text += ('There have been a total of ' + totalSpins + ' spins and ' + totalJackpots + ' jackpots.\r\n');
         text += maxSpins + ' is the most spins played by one person.\r\n';
         text += utils.getAdText(newads);
       }
@@ -92,25 +94,10 @@ function getEntriesFromDB(callback) {
 
        utils.getAdSummary(data, newads);
        for (i = 0; i < data.Items.length; i++) {
-         if (data.Items[i].mapAttr && data.Items[i].mapAttr.M
-          && data.Items[i].mapAttr.M.basic && data.Items[i].mapAttr.M.basic.M) {
-           const entry = {};
-
-           if (data.Items[i].mapAttr.M.basic.M.spins) {
-             const spins = parseInt(data.Items[i].mapAttr.M.basic.M.spins.N);
-
-             entry.spins = isNaN(spins) ? 0 : spins;
-             if (data.Items[i].mapAttr.M.basic.M.high) {
-               const high = parseInt(data.Items[i].mapAttr.M.basic.M.high.N);
-
-               entry.high = isNaN(high) ? 0 : high;
-             }
-           } else {
-             entry.spins = 0;
-           }
-
-           results.push(entry);
-         }
+        const entry = getEntryForGame(data.Items[i], 'basic');
+        if (entry) {
+          results.push(entry);
+        }
        }
 
        if (data.LastEvaluatedKey) {
@@ -123,6 +110,38 @@ function getEntriesFromDB(callback) {
   }).catch((err) => {
     callback(err, null), null;
   });
+}
+
+function getEntryForGame(item, game) {
+  let entry;
+
+  if (item.mapAttr && item.mapAttr.M
+    && item.mapAttr.M[game] && item.mapAttr.M[game].M) {
+     entry = {};
+
+     if (item.mapAttr.M[game].M.spins) {
+       const spins = parseInt(item.mapAttr.M[game].M.spins.N);
+
+       entry.spins = isNaN(spins) ? 0 : spins;
+       if (item.mapAttr.M[game].M.high) {
+         const high = parseInt(item.mapAttr.M[game].M.high.N);
+
+         entry.high = isNaN(high) ? 0 : high;
+       }
+     } else {
+       entry.spins = 0;
+     }
+
+     if (item.mapAttr.M[game].M.jackpot) {
+       const jackpot = parseInt(item.mapAttr.M[game].M.jackpot.N);
+
+       entry.jackpot = isNaN(jackpot) ? 0 : jackpot;
+     } else {
+       entry.jackpot = 0;
+     }
+   }
+
+   return entry;
 }
 
 function checkScoreChange(newScores, callback) {
