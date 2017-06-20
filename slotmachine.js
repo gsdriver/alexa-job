@@ -44,7 +44,7 @@ module.exports = {
             if (game) {
               text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
               text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
-              if (spins[game] > 0) {
+              if (spins[game] && (spins[game].spins > 0)) {
                 text += ('There have been ' + spins[game].spins + ' spins towards the next progressive jackpot. ');
               }
               text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
