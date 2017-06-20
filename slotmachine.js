@@ -17,39 +17,51 @@ module.exports = {
 
     getEntriesFromDB((err, results, newads) => {
       if (err) {
-        text = 'Error getting slotmachine data: ' + err;
+        callback('Error getting slotmachine data: ' + err);
       } else {
         const games = {};
         let thisGame;
         let i;
 
-        for (i = 0; i < results.length; i++) {
-          if (!games[results[i].game]) {
-            games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0, maxSpins: 0};
+        getProgressiveStatus((progressiveStatus) => {
+          for (i = 0; i < results.length; i++) {
+            if (!games[results[i].game]) {
+              games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0,
+                        maxSpins: 0, progressiveSpins: 0};
+            }
+
+            thisGame = games[results[i].game];
+            thisGame.players++;
+            thisGame.totalSpins += results[i].spins;
+            thisGame.totalJackpots += results[i].jackpot;
+
+            if (results[i].progressiveSpins &&
+                  progressiveStatus[results[i].game] &&
+                  ((results[i].lastSpin) > progressiveStatus[results[i].game].lastwin)) {
+              thisGame.progressiveSpins += results[i].progressiveSpins;
+            }
+
+            if (results[i].spins > thisGame.maxSpins) {
+              thisGame.maxSpins = results[i].spins;
+            }
           }
 
-          thisGame = games[results[i].game];
-          thisGame.players++;
-          thisGame.totalSpins += results[i].spins;
-          thisGame.totalJackpots += results[i].jackpot;
-          if (results[i].spins > thisGame.maxSpins) {
-            thisGame.maxSpins = results[i].spins;
+          let game;
+          for (game in games) {
+            if (game) {
+              text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
+              text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
+              if (games[game].progressiveSpins > 0) {
+                text += ('There have been ' + games[game].progressiveSpins + ' spins towards the next progressive jackpot. ');
+              }
+              text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
+            }
           }
-        }
 
-        let game;
-        for (game in games) {
-          if (game) {
-            text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
-            text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
-            text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
-          }
-        }
-
-        text += utils.getAdText(newads);
+          text += utils.getAdText(newads);
+          callback(text);
+        });
       }
-
-      callback(text);
     });
   },
   updateSlotMachineScores: function() {
@@ -164,10 +176,32 @@ function getEntryForGame(item, game) {
       } else {
         entry.jackpot = 0;
       }
+
+      if (item.mapAttr.M[game].M.progressiveSpins) {
+        const progressiveSpins = parseInt(item.mapAttr.M[game].M.progressiveSpins.N);
+
+        entry.progressiveSpins = isNaN(progressiveSpins) ? 0 : progressiveSpins;
+        if (item.mapAttr.M[game].M.timestamp) {
+          entry.lastSpin = parseInt(item.mapAttr.M[game].M.timestamp.N);
+        }
+      }
     }
   }
 
   return entry;
+}
+
+function getProgressiveStatus(callback) {
+  // Read the S3 bucket with Progressive Status
+  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'SlotMachine-Progressive.txt'}, (err, data) => {
+    if (err) {
+      console.log(err, err.stack);
+      callback(undefined);
+    } else {
+      // Get the scores array from the file
+      callback(JSON.parse(data.Body.toString('ascii')));
+    }
+  });
 }
 
 function checkScoreChange(newScores, callback) {
