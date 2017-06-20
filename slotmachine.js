@@ -23,36 +23,29 @@ module.exports = {
         let thisGame;
         let i;
 
-        getProgressiveStatus((progressiveStatus) => {
-          for (i = 0; i < results.length; i++) {
-            if (!games[results[i].game]) {
-              games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0,
-                        maxSpins: 0, progressiveSpins: 0};
-            }
-
-            thisGame = games[results[i].game];
-            thisGame.players++;
-            thisGame.totalSpins += results[i].spins;
-            thisGame.totalJackpots += results[i].jackpot;
-
-            if (results[i].progressiveSpins &&
-                  progressiveStatus[results[i].game] &&
-                  ((results[i].lastSpin) > progressiveStatus[results[i].game].lastwin)) {
-              thisGame.progressiveSpins += results[i].progressiveSpins;
-            }
-
-            if (results[i].spins > thisGame.maxSpins) {
-              thisGame.maxSpins = results[i].spins;
-            }
+        for (i = 0; i < results.length; i++) {
+          if (!games[results[i].game]) {
+            games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0, maxSpins: 0};
           }
 
+          thisGame = games[results[i].game];
+          thisGame.players++;
+          thisGame.totalSpins += results[i].spins;
+          thisGame.totalJackpots += results[i].jackpot;
+
+          if (results[i].spins > thisGame.maxSpins) {
+            thisGame.maxSpins = results[i].spins;
+          }
+        }
+
+        getProgressive(results, (spins, status) => {
           let game;
           for (game in games) {
             if (game) {
               text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
               text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
-              if (games[game].progressiveSpins > 0) {
-                text += ('There have been ' + games[game].progressiveSpins + ' spins towards the next progressive jackpot. ');
+              if (spins[game] > 0) {
+                text += ('There have been ' + spins[game].spins + ' spins towards the next progressive jackpot. ');
               }
               text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
             }
@@ -90,13 +83,13 @@ module.exports = {
 
         scoreData.scores = scores;
 
-        // Let's only write to S3 if these scores have changed
-        checkScoreChange(scoreData.scores, (diff) => {
-          if (diff != 'same') {
-            // It's not the same, so try to write it out
-            const params = {Body: JSON.stringify(scoreData),
+        // Do we need to update the spins for the progressive jackpot?
+        getProgressive(results, (spins, status) => {
+          // If it changed, write the new results out
+          if (status != 'same') {
+            const params = {Body: JSON.stringify(spins),
               Bucket: 'garrett-alexa-usage',
-              Key: 'SlotMachineScores2.txt'};
+              Key: 'SlotMachine-Progressive.txt'};
 
             s3.putObject(params, (err, data) => {
               if (err) {
@@ -104,6 +97,22 @@ module.exports = {
               }
             });
           }
+
+          // Only write high scores to S3 if they have changed
+          checkScoreChange(scoreData.scores, (diff) => {
+            if (diff != 'same') {
+              // It's not the same, so try to write it out
+              const params = {Body: JSON.stringify(scoreData),
+                Bucket: 'garrett-alexa-usage',
+                Key: 'SlotMachineScores2.txt'};
+
+              s3.putObject(params, (err, data) => {
+                if (err) {
+                  console.log(err, err.stack);
+                }
+              });
+            }
+          });
         });
       }
     });
@@ -191,15 +200,47 @@ function getEntryForGame(item, game) {
   return entry;
 }
 
-function getProgressiveStatus(callback) {
+function getProgressive(results, callback) {
   // Read the S3 bucket with Progressive Status
   s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'SlotMachine-Progressive.txt'}, (err, data) => {
     if (err) {
       console.log(err, err.stack);
       callback(undefined);
     } else {
-      // Get the scores array from the file
-      callback(JSON.parse(data.Body.toString('ascii')));
+      const progressive = JSON.parse(data.Body.toString('ascii'));
+      const spins = {};
+      let i;
+      let status = 'same';
+      let game;
+
+      for (i = 0; i < results.length; i++) {
+        game = results[i].game;
+
+        if (results[i].progressiveSpins &&
+              progressive[game] &&
+              ((results[i].lastSpin) > progressive[game].lastwin)) {
+          if (!spins[game]) {
+            spins[game] = {spins: 0};
+
+            spins[game].lastwin = (progressive[game] && progressive[game].lastwin)
+                    ? progressive[game].lastwin : 0;
+          }
+
+          spins[game].spins += results[i].progressiveSpins;
+        }
+      }
+
+      // Does what is written in S3 match what the DB says?
+      for (game in spins) {
+        if (game && (spins[game].spins)) {
+          if (progressive[game] &&
+            (spins[game].spins != progressive[game].spins)) {
+            status = 'different';
+          }
+        }
+      }
+
+      callback(spins, status);
     }
   });
 }
