@@ -217,8 +217,8 @@ function getProgressive(results, callback) {
         game = results[i].game;
 
         if (results[i].progressiveSpins &&
-              progressive[game] &&
-              ((results[i].lastSpin) > progressive[game].lastwin)) {
+              (!progressive[game] ||
+              (results[i].lastSpin > progressive[game].lastwin))) {
           if (!spins[game]) {
             spins[game] = {spins: 0};
 
@@ -233,7 +233,7 @@ function getProgressive(results, callback) {
       // Does what is written in S3 match what the DB says?
       for (game in spins) {
         if (game && (spins[game].spins)) {
-          if (progressive[game] &&
+          if (!progressive[game] ||
             (spins[game].spins != progressive[game].spins)) {
             status = 'different';
           }
