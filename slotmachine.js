@@ -38,14 +38,14 @@ module.exports = {
           }
         }
 
-        getProgressive(results, (spins, status) => {
+        getProgressive(results, (played, status) => {
           let game;
           for (game in games) {
             if (game) {
               text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
               text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
-              if (spins[game] && (spins[game].spins > 0)) {
-                text += ('There have been ' + spins[game].spins + ' spins towards the next progressive jackpot. ');
+              if (played[game] && (played[game].coins > 0)) {
+                text += ('There have been ' + played[game].coins + ' coins towards the next progressive jackpot. ');
               }
               text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
             }
@@ -83,11 +83,11 @@ module.exports = {
 
         scoreData.scores = scores;
 
-        // Do we need to update the spins for the progressive jackpot?
-        getProgressive(results, (spins, status) => {
+        // Do we need to update the coins for the progressive jackpot?
+        getProgressive(results, (played, status) => {
           // If it changed, write the new results out
           if (status != 'same') {
-            const params = {Body: JSON.stringify(spins),
+            const params = {Body: JSON.stringify(played),
               Bucket: 'garrett-alexa-usage',
               Key: 'SlotMachine-Progressive.txt'};
 
@@ -186,10 +186,10 @@ function getEntryForGame(item, game) {
         entry.jackpot = 0;
       }
 
-      if (item.mapAttr.M[game].M.progressiveSpins) {
-        const progressiveSpins = parseInt(item.mapAttr.M[game].M.progressiveSpins.N);
+      if (item.mapAttr.M[game].M.coinsPlayed) {
+        const coinsPlayed = parseInt(item.mapAttr.M[game].M.coinsPlayed.N);
 
-        entry.progressiveSpins = isNaN(progressiveSpins) ? 0 : progressiveSpins;
+        entry.coinsPlayed = isNaN(coinsPlayed) ? 0 : coinsPlayed;
         if (item.mapAttr.M[game].M.timestamp) {
           entry.lastSpin = parseInt(item.mapAttr.M[game].M.timestamp.N);
         }
@@ -208,7 +208,7 @@ function getProgressive(results, callback) {
       callback(undefined);
     } else {
       const progressive = JSON.parse(data.Body.toString('ascii'));
-      const spins = {};
+      const played = {};
       let i;
       let status = 'same';
       let game;
@@ -216,31 +216,31 @@ function getProgressive(results, callback) {
       for (i = 0; i < results.length; i++) {
         game = results[i].game;
 
-        if (results[i].progressiveSpins &&
+        if (results[i].coinsPlayed &&
               (!progressive[game] ||
               (results[i].lastSpin > progressive[game].lastwin))) {
-          if (!spins[game]) {
-            spins[game] = {spins: 0};
+          if (!played[game]) {
+            played[game] = {coins: 0};
 
-            spins[game].lastwin = (progressive[game] && progressive[game].lastwin)
+            played[game].lastwin = (progressive[game] && progressive[game].lastwin)
                     ? progressive[game].lastwin : 0;
           }
 
-          spins[game].spins += results[i].progressiveSpins;
+          played[game].coins += results[i].coinsPlayed;
         }
       }
 
       // Does what is written in S3 match what the DB says?
-      for (game in spins) {
-        if (game && (spins[game].spins)) {
+      for (game in played) {
+        if (game && (played[game].coins)) {
           if (!progressive[game] ||
-            (spins[game].spins != progressive[game].spins)) {
+            (played[game].coins != progressive[game].coins)) {
             status = 'different';
           }
         }
       }
 
-      callback(spins, status);
+      callback(played, status);
     }
   });
 }
