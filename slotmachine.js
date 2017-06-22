@@ -38,15 +38,18 @@ module.exports = {
           }
         }
 
-        getProgressive(results, (played, status) => {
+        // Get the progressive jackpot
+        getProgressive('progressive', (coins) => {
           let game;
           for (game in games) {
             if (game) {
               text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
               text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
-              if (played[game] && (played[game].coins > 0)) {
-                text += ('There have been ' + played[game].coins + ' coins towards the next progressive jackpot. ');
+
+              if ((game === 'progressive') && coins && (coins > 0)) {
+                text += ('There have been ' + coins + ' coins towards the next progressive jackpot. ');
               }
+
               text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
             }
           }
@@ -83,13 +86,13 @@ module.exports = {
 
         scoreData.scores = scores;
 
-        // Do we need to update the coins for the progressive jackpot?
-        getProgressive(results, (played, status) => {
-          // If it changed, write the new results out
-          if (status != 'same') {
-            const params = {Body: JSON.stringify(played),
+        // Only write high scores to S3 if they have changed
+        checkScoreChange(scoreData.scores, (diff) => {
+          if (diff != 'same') {
+            // It's not the same, so try to write it out
+            const params = {Body: JSON.stringify(scoreData),
               Bucket: 'garrett-alexa-usage',
-              Key: 'SlotMachine-Progressive.txt'};
+              Key: 'SlotMachineScores2.txt'};
 
             s3.putObject(params, (err, data) => {
               if (err) {
@@ -97,22 +100,6 @@ module.exports = {
               }
             });
           }
-
-          // Only write high scores to S3 if they have changed
-          checkScoreChange(scoreData.scores, (diff) => {
-            if (diff != 'same') {
-              // It's not the same, so try to write it out
-              const params = {Body: JSON.stringify(scoreData),
-                Bucket: 'garrett-alexa-usage',
-                Key: 'SlotMachineScores2.txt'};
-
-              s3.putObject(params, (err, data) => {
-                if (err) {
-                  console.log(err, err.stack);
-                }
-              });
-            }
-          });
         });
       }
     });
@@ -185,62 +172,27 @@ function getEntryForGame(item, game) {
       } else {
         entry.jackpot = 0;
       }
-
-      if (item.mapAttr.M[game].M.coinsPlayed) {
-        const coinsPlayed = parseInt(item.mapAttr.M[game].M.coinsPlayed.N);
-
-        entry.coinsPlayed = isNaN(coinsPlayed) ? 0 : coinsPlayed;
-        if (item.mapAttr.M[game].M.timestamp) {
-          entry.lastSpin = parseInt(item.mapAttr.M[game].M.timestamp.N);
-        }
-      }
     }
   }
 
   return entry;
 }
 
-function getProgressive(results, callback) {
-  // Read the S3 bucket with Progressive Status
-  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'SlotMachine-Progressive.txt'}, (err, data) => {
-    if (err) {
-      console.log(err, err.stack);
+function getProgressive(game, callback) {
+  // Read from Dynamodb
+  dynamodb.getItem({TableName: 'Slots', Key: {userId: {S: 'game-' + game}}},
+          (err, data) => {
+    if (err || (data.Item === undefined)) {
       callback(undefined);
     } else {
-      const progressive = JSON.parse(data.Body.toString('ascii'));
-      const played = {};
-      let i;
-      let status = 'same';
-      let game;
+      // Do we have
+      let coins;
 
-      for (i = 0; i < results.length; i++) {
-        game = results[i].game;
-
-        if (results[i].coinsPlayed &&
-              (!progressive[game] ||
-              (results[i].lastSpin > progressive[game].lastwin))) {
-          if (!played[game]) {
-            played[game] = {coins: 0};
-
-            played[game].lastwin = (progressive[game] && progressive[game].lastwin)
-                    ? progressive[game].lastwin : 0;
-          }
-
-          played[game].coins += results[i].coinsPlayed;
-        }
+      if (data.Item.coins && data.Item.coins.N) {
+        coins = parseInt(data.Item.coins.N);
       }
 
-      // Does what is written in S3 match what the DB says?
-      for (game in played) {
-        if (game && (played[game].coins)) {
-          if (!progressive[game] ||
-            (played[game].coins != progressive[game].coins)) {
-            status = 'different';
-          }
-        }
-      }
-
-      callback(played, status);
+      callback(coins);
     }
   });
 }
