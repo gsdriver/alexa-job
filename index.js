@@ -47,35 +47,45 @@ function sendEmail(text, callback) {
   SES.sendEmail(params, callback);
 }
 
-if (process.env.SETS3) {
+if (!process.env.SINGLERUN) {
+  let mailSent;
+
   // Get the ranks every 5 minutes and write to S3 if successful
   setInterval(() => {
+    // Write to S3
     roulette.updateRouletteScores();
     slotmachine.updateSlotMachineScores();
-  }, 1000*60*5);
-}
 
-if (process.env.SENDMAIL) {
-  // Send a summary mail every 12 hours
-  setInterval(() => {
-    // Yes, this is the first run of the day, so let's send an e-mail summary
-    blackjack.getBlackjackMail((bjText) => {
-      slotmachine.getSlotsMail((slotText) => {
-        roulette.getRouletteMail((rouletteText) => {
-          const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText;
+    // Send mail around 5 AM and 5 PM
+    const d = new Date();
+    d.setHours(d.getHours() - 7);
 
-          console.log(mailBody);
-          sendEmail(mailBody, (err, data) => {
-            if (err) {
-              console.log('Error sending mail ' + err);
-            } else {
-              console.log('Mail sent!');
-            }
+    if ((d.getHours() % 12) == 5) {
+      if (!mailSent) {
+        // First time in this hour!
+        mailSent = true;
+        blackjack.getBlackjackMail((bjText) => {
+          slotmachine.getSlotsMail((slotText) => {
+            roulette.getRouletteMail((rouletteText) => {
+              const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText;
+
+              console.log(mailBody);
+              sendEmail(mailBody, (err, data) => {
+                if (err) {
+                  console.log('Error sending mail ' + err);
+                } else {
+                  console.log('Mail sent!');
+                }
+              });
+            });
           });
         });
-      });
-    });
-  }, 1000*60*60*12);
+      }
+    } else {
+      // Not 5:00 hour anymore, so reset mailSent
+      mailSent = false;
+    }
+  }, 1000*60*5);
 }
 
 if (process.env.SINGLERUN) {
