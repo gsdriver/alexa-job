@@ -22,10 +22,12 @@ module.exports = {
         const games = {};
         let thisGame;
         let i;
+        let numGames = 0;
 
         for (i = 0; i < results.length; i++) {
           if (!games[results[i].game]) {
             games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0, maxSpins: 0};
+            numGames++;
           }
 
           thisGame = games[results[i].game];
@@ -39,24 +41,29 @@ module.exports = {
         }
 
         // Get the progressive jackpot
-        getProgressive('progressive', (coins) => {
-          let game;
-          for (game in games) {
-            if (game) {
+        let game;
+        let readGames = 0;
+        for (game in games) {
+          if (game) {
+            getProgressive(game, (game, coins) => {
               text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
               text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
 
-              if ((game === 'progressive') && coins && (coins > 0)) {
-                text += ('There have been ' + coins + ' coins towards the next progressive jackpot. ');
+              if (coins && (coins > 0)) {
+                text += ('There are ' + coins + ' coins towards the next progressive jackpot. ');
               }
 
               text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
-            }
-          }
 
-          text += utils.getAdText(newads);
-          callback(text);
-        });
+              // Are we done?
+              readGames++;
+              if (readGames === numGames) {
+                text += utils.getAdText(newads);
+                callback(text);
+              }
+            });
+          }
+        }
       }
     });
   },
@@ -183,7 +190,7 @@ function getProgressive(game, callback) {
   dynamodb.getItem({TableName: 'Slots', Key: {userId: {S: 'game-' + game}}},
           (err, data) => {
     if (err || (data.Item === undefined)) {
-      callback(undefined);
+      callback(game, undefined);
     } else {
       // Do we have
       let coins;
@@ -192,7 +199,7 @@ function getProgressive(game, callback) {
         coins = parseInt(data.Item.coins.N);
       }
 
-      callback(coins);
+      callback(game, coins);
     }
   });
 }
