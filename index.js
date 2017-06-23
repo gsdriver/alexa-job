@@ -47,8 +47,9 @@ function sendEmail(text, callback) {
   SES.sendEmail(params, callback);
 }
 
-if (!process.env.SINGLERUN) {
+if (process.env.RUNLOOP) {
   let mailSent;
+  let closedTournament;
 
   // Get the ranks every 5 minutes and write to S3 if successful
   setInterval(() => {
@@ -84,6 +85,24 @@ if (!process.env.SINGLERUN) {
     } else {
       // Not 5:00 hour anymore, so reset mailSent
       mailSent = false;
+    }
+
+    // And close the tournament down on Fridays after 1 AM
+    if ((d.getDay() == 5) && (d.getHours() % 12 == 1)) {
+      if (!closedTournament) {
+        // First time in this hour!
+        closedTournament = true;
+        roulette.closeTournament((err) => {
+          if (err) {
+            console.log('Closing error: ' + err);
+          } else {
+            console.log('Closed tournament!');
+          }
+        });
+      }
+    } else {
+      // Not Friday at 1:00, so reset flag
+      closedTournament = false;
     }
   }, 1000*60*5);
 }
