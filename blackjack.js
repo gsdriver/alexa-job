@@ -24,6 +24,7 @@ module.exports = {
         let i;
         const players = {};
         let ads = 0;
+        let nonService = 0;
 
         for (i = 0; i < results.length; i++) {
           if (players[results[i].locale]) {
@@ -43,9 +44,12 @@ module.exports = {
           if (results[i].adplayed) {
             ads++;
           }
+          if (results[i].nonService) {
+            nonService++;
+          }
         }
 
-        text = 'There are ' + results.length + ' registered players: ';
+        text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service: ';
         text += (players['en-US'] ? players['en-US'] : 'no') + ' American, ';
         text += (players['en-GB'] ? players['en-GB'] : 'no') + ' English, ';
         text += 'and ' + (players['de-DE'] ? players['de-DE'] : 'no') + ' German.\r\n';
@@ -84,6 +88,7 @@ function getEntriesFromDB(callback) {
            entry.numRounds = parseInt(data.Items[i].mapAttr.M.numRounds.N);
            entry.locale = data.Items[i].mapAttr.M.playerLocale.S;
            entry.adplayed = (data.Items[i].mapAttr.M.adStamp != undefined);
+           entry.nonService = (data.Items[i].mapAttr.M.standard != undefined);
            results.push(entry);
          }
        }

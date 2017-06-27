@@ -88,7 +88,7 @@ if (process.env.RUNLOOP) {
     }
 
     // And close the tournament down on Fridays after 1 AM
-    if ((d.getDay() == 5) && (d.getHours() % 12 == 1)) {
+    if ((d.getDay() == 5) && (d.getHours() == 1)) {
       if (!closedTournament) {
         // First time in this hour!
         closedTournament = true;
