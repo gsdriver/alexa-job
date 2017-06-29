@@ -25,6 +25,8 @@ module.exports = {
         const players = {};
         let ads = 0;
         let nonService = 0;
+        let hands = 0;
+        let high = 0;
 
         for (i = 0; i < results.length; i++) {
           if (players[results[i].locale]) {
@@ -47,14 +49,21 @@ module.exports = {
           if (results[i].nonService) {
             nonService++;
           }
+          if (results[i].hands) {
+            hands++;
+          }
+          if (results[i].high && (results[i].high > high)) {
+            high = results[i].high;
+          }
         }
 
         text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service: ';
         text += (players['en-US'] ? players['en-US'] : 'no') + ' American, ';
         text += (players['en-GB'] ? players['en-GB'] : 'no') + ' English, ';
         text += 'and ' + (players['de-DE'] ? players['de-DE'] : 'no') + ' German.\r\n';
-        text += ('There have been a total of ' + totalRounds + ' rounds played.\r\n');
+        text += ('There have been a total of ' + totalRounds + ' sessions played.\r\n');
         text += multiplePlays + ' people have played more than one round. ' + maxRounds + ' is the most rounds played by one person.\r\n';
+        text += ('Since v5, there have been ' + hands + ' hands played. The high score is $' + high + '.\r\n');
         text += (ads + ' people have heard your old-format ad.\r\n');
         text += utils.getAdText(newads);
       }
@@ -88,7 +97,15 @@ function getEntriesFromDB(callback) {
            entry.numRounds = parseInt(data.Items[i].mapAttr.M.numRounds.N);
            entry.locale = data.Items[i].mapAttr.M.playerLocale.S;
            entry.adplayed = (data.Items[i].mapAttr.M.adStamp != undefined);
-           entry.nonService = (data.Items[i].mapAttr.M.standard != undefined);
+           if (data.Items[i].mapAttr.M.standard && data.Items[i].mapAttr.M.standard.M) {
+             const standardGame = data.Items[i].mapAttr.M.standard.M;
+
+             entry.nonService = true;
+             entry.hands = standardGame.hands;
+             if (standardGame.high && standardGame.high.N) {
+               entry.high = parseInt(standardGame.high.N);
+             }
+           }
            results.push(entry);
          }
        }
