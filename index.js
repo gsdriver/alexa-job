@@ -56,6 +56,7 @@ if (process.env.RUNLOOP) {
     // Write to S3
     roulette.updateRouletteScores();
     slotmachine.updateSlotMachineScores();
+    blackjack.updateBlackjackScores();
 
     // Send mail around 5 AM and 5 PM
     const d = new Date();

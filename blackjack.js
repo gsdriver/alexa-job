@@ -7,6 +7,7 @@
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
 const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
+const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
 
 module.exports = {
@@ -71,6 +72,41 @@ module.exports = {
       callback(text);
     });
   },
+  updateBlackjackScores: function() {
+    getEntriesFromDB((err, results, newads) => {
+      if (!err) {
+        const scoreData = {timestamp: Date.now()};
+        // Only support standard for now
+        const scores = {standard: []};
+        let i;
+
+        for (i = 0; i < results.length; i++) {
+          if (results[i].high) {
+            scores.standard.push(results[i].high);
+          }
+        }
+
+        scores.standard.sort((a, b) => (b - a));
+        scoreData.scores = scores;
+
+        // Only write high scores to S3 if they have changed
+        checkScoreChange(scoreData.scores, (diff) => {
+          if (diff != 'same') {
+            // It's not the same, so try to write it out
+            const params = {Body: JSON.stringify(scoreData),
+              Bucket: 'garrett-alexa-usage',
+              Key: 'BlackjackScores.txt'};
+
+            s3.putObject(params, (err, data) => {
+              if (err) {
+                console.log(err, err.stack);
+              }
+            });
+          }
+        });
+      }
+    });
+  },
 };
 
 // Function to get all the entries from the Database
@@ -119,5 +155,53 @@ function getEntriesFromDB(callback) {
     callback(null, results, newads);
   }).catch((err) => {
     callback(err, null), null;
+  });
+}
+
+function checkScoreChange(newScores, callback) {
+  // Read the S3 buckets that has everyone's scores
+  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'BlackjackScores.txt'}, (err, data) => {
+    if (err) {
+      console.log(err, err.stack);
+      callback('error');
+    } else {
+      // Get the scores array from the file
+      const currentScoreData = JSON.parse(data.Body.toString('ascii'));
+      let game;
+      let oldLength;
+      let newLength;
+      const scores = (currentScoreData) ? (currentScoreData.scores) : undefined;
+
+      for (game in newScores) {
+        if (game) {
+          if (!scores || !scores[game]) {
+            callback('different');
+            return;
+          }
+
+          oldLength = (scores[game]) ? scores[game].length : 0;
+          newLength = (newScores[game]) ? newScores[game].length : 0;
+
+          if (oldLength != newLength) {
+            // They are different
+            callback('different');
+            return;
+          } else {
+            // Check if all alements are the same
+            let i = 0;
+
+            for (i = 0; i < newLength; i++) {
+              if (scores[game][i] != newScores[game][i]) {
+                callback('different');
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      // If we made it this far, we are the same
+      callback('same');
+    }
   });
 }
