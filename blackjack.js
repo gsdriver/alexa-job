@@ -51,7 +51,7 @@ module.exports = {
             nonService++;
           }
           if (results[i].hands) {
-            hands++;
+            hands += results[i].hands;
           }
           if (results[i].high && (results[i].high > high)) {
             high = results[i].high;
@@ -137,7 +137,9 @@ function getEntriesFromDB(callback) {
              const standardGame = data.Items[i].mapAttr.M.standard.M;
 
              entry.nonService = true;
-             entry.hands = standardGame.hands;
+             if (standardGame.hands && standardGame.hands.N) {
+               entry.hands = parseInt(standardGame.hands.N);
+             }
              if (standardGame.high && standardGame.high.N) {
                entry.high = parseInt(standardGame.high.N);
              }
