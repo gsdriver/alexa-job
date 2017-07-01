@@ -17,7 +17,7 @@ module.exports = {
 
     getEntriesFromDB((err, results, newads) => {
       if (err) {
-        text = 'Error getting blackjack data: ' + err;
+        callback('Error getting blackjack data: ' + err);
       } else {
         let totalRounds = 0;
         let maxRounds = 0;
@@ -58,18 +58,21 @@ module.exports = {
           }
         }
 
-        text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service: ';
-        text += (players['en-US'] ? players['en-US'] : 'no') + ' American, ';
-        text += (players['en-GB'] ? players['en-GB'] : 'no') + ' English, ';
-        text += 'and ' + (players['de-DE'] ? players['de-DE'] : 'no') + ' German.\r\n';
-        text += ('There have been a total of ' + totalRounds + ' sessions played.\r\n');
-        text += multiplePlays + ' people have played more than one round. ' + maxRounds + ' is the most rounds played by one person.\r\n';
-        text += ('Since v5, there have been ' + hands + ' hands played. The high score is $' + high + '.\r\n');
-        text += (ads + ' people have heard your old-format ad.\r\n');
-        text += utils.getAdText(newads);
+        // Get the progressive information for standard
+        getProgressive('standard', (game, progressiveHands, jackpots) => {
+          text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service: ';
+          text += (players['en-US'] ? players['en-US'] : 'no') + ' American, ';
+          text += (players['en-GB'] ? players['en-GB'] : 'no') + ' English, ';
+          text += 'and ' + (players['de-DE'] ? players['de-DE'] : 'no') + ' German.\r\n';
+          text += ('There have been a total of ' + totalRounds + ' sessions played.\r\n');
+          text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
+          text += multiplePlays + ' people have played more than one round. ' + maxRounds + ' is the most rounds played by one person.\r\n';
+          text += ('Since v5, there have been ' + hands + ' hands played. The high score is $' + high + '.\r\n');
+          text += (ads + ' people have heard your old-format ad.\r\n');
+          text += utils.getAdText(newads);
+          callback(text);
+        });
       }
-
-      callback(text);
     });
   },
   updateBlackjackScores: function() {
@@ -204,6 +207,29 @@ function checkScoreChange(newScores, callback) {
 
       // If we made it this far, we are the same
       callback('same');
+    }
+  });
+}
+
+function getProgressive(game, callback) {
+  // Read from Dynamodb
+  dynamodb.getItem({TableName: 'PlayBlackjack', Key: {userId: {S: 'game-' + game}}},
+          (err, data) => {
+    if (err || (data.Item === undefined)) {
+      callback(game, undefined);
+    } else {
+      // Do we have
+      let hands;
+      let jackpots;
+
+      if (data.Item.hands && data.Item.hands.N) {
+        hands = parseInt(data.Item.hands.N);
+      }
+      if (data.Item.jackpots && data.Item.jackpots.N) {
+        jackpots = parseInt(data.Item.jackpots.N);
+      }
+
+      callback(game, hands, jackpots);
     }
   });
 }
