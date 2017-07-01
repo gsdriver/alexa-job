@@ -24,7 +24,6 @@ module.exports = {
         let multiplePlays = 0;
         let i;
         const players = {};
-        let ads = 0;
         let nonService = 0;
         let hands = 0;
         let high = 0;
@@ -42,10 +41,6 @@ module.exports = {
           }
           if (results[i].numRounds > 1) {
             multiplePlays++;
-          }
-
-          if (results[i].adplayed) {
-            ads++;
           }
           if (results[i].nonService) {
             nonService++;
@@ -67,8 +62,7 @@ module.exports = {
           text += ('There have been a total of ' + totalRounds + ' sessions played.\r\n');
           text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
           text += multiplePlays + ' people have played more than one round. ' + maxRounds + ' is the most rounds played by one person.\r\n';
-          text += ('Since v5, there have been ' + hands + ' hands played. The high score is $' + high + '.\r\n');
-          text += (ads + ' people have heard your old-format ad.\r\n');
+          text += ('Since moving off the service, there have been ' + hands + ' hands played. The high score is $' + high + '.\r\n');
           text += utils.getAdText(newads);
           callback(text);
         });
