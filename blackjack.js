@@ -27,6 +27,8 @@ module.exports = {
         let nonService = 0;
         let hands = 0;
         let high = 0;
+        let recentGames = 0;
+        const now = Date.now();
 
         for (i = 0; i < results.length; i++) {
           if (players[results[i].locale]) {
@@ -51,11 +53,16 @@ module.exports = {
           if (results[i].high && (results[i].high > high)) {
             high = results[i].high;
           }
+          if (results[i].timestamp &&
+            ((now - results[i].timestamp) < 24*60*60*1000)) {
+            recentGames++;
+          }
         }
 
         // Get the progressive information for standard
         getProgressive('standard', (game, progressiveHands, jackpots) => {
-          text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service: ';
+          text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service ';
+          text += 'and ' + recentGames + ' of whom have played in the past 24 hours: ';
           text += (players['en-US'] ? players['en-US'] : 'no') + ' American, ';
           text += (players['en-GB'] ? players['en-GB'] : 'no') + ' English, ';
           text += 'and ' + (players['de-DE'] ? players['de-DE'] : 'no') + ' German.\r\n';
@@ -139,6 +146,9 @@ function getEntriesFromDB(callback) {
              }
              if (standardGame.high && standardGame.high.N) {
                entry.high = parseInt(standardGame.high.N);
+             }
+             if (standardGame.timestamp && standardGame.timestamp.N) {
+               entry.timestamp = parseInt(standardGame.timestamp.N);
              }
            }
            results.push(entry);
