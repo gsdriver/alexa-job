@@ -23,10 +23,11 @@ module.exports = {
         let thisGame;
         let i;
         let numGames = 0;
+        const now = Date.now();
 
         for (i = 0; i < results.length; i++) {
           if (!games[results[i].game]) {
-            games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0, maxSpins: 0};
+            games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0, maxSpins: 0, recentGames: 0};
             numGames++;
           }
 
@@ -34,6 +35,12 @@ module.exports = {
           thisGame.players++;
           thisGame.totalSpins += results[i].spins;
           thisGame.totalJackpots += results[i].jackpot;
+
+          // Was this game played in the last 24 hours?
+          if (results[i].timestamp &&
+            ((now - results[i].timestamp) < 24*60*60*1000)) {
+            thisGame.recentGames++;
+          }
 
           if (results[i].spins > thisGame.maxSpins) {
             thisGame.maxSpins = results[i].spins;
@@ -46,7 +53,8 @@ module.exports = {
         for (game in games) {
           if (game) {
             getProgressive(game, (game, coins) => {
-              text += 'For ' + game + ' there are ' + games[game].players + ' registered players: ';
+              text += 'For ' + game + ' there are ' + games[game].players + ' total players ';
+              text += 'of whom ' + games[game].recentGames + ' have played in the past 24 hours.  ';
               text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
 
               if (coins && (coins > 0)) {
@@ -178,6 +186,11 @@ function getEntryForGame(item, game) {
         entry.jackpot = isNaN(jackpot) ? 0 : jackpot;
       } else {
         entry.jackpot = 0;
+      }
+
+      if (item.mapAttr.M[game].M.timestamp
+        && item.mapAttr.M[game].M.timestamp.N) {
+        entry.timestamp = parseInt(item.mapAttr.M[game].M.timestamp.N);
       }
     }
   }

@@ -13,14 +13,15 @@ const utils = require('./utils');
 module.exports = {
   // Generates the text for blackjack e-mail summary
   getRouletteMail: function(callback) {
-    const american = {high: 0, spins: 0, players: 0};
-    const european = {high: 0, spins: 0, players: 0};
+    const american = {high: 0, spins: 0, players: 0, recentPlayers: 0};
+    const european = {high: 0, spins: 0, players: 0, recentPlayers: 0};
     const tournament = {high: 0, spins: 0, players: 0};
     const adsPlayed = {};
     let spins;
     let text;
     let oldFormat = 0;
     let newFormat = 0;
+    const now = Date.now();
 
     getLastCloseTime((tournamentClose) => {
       // Loop thru to read in all items from the DB
@@ -83,6 +84,11 @@ module.exports = {
                        if (parseInt(scoreData.high.N) > american.high) {
                          american.high = parseInt(scoreData.high.N);
                        }
+                       if (scoreData.timestamp && scoreData.timestamp.N) {
+                         if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
+                           american.recentPlayers++;
+                         }
+                       }
                      }
                    }
 
@@ -99,6 +105,11 @@ module.exports = {
                        if (parseInt(scoreData.high.N) > european.high) {
                          european.high = parseInt(scoreData.high.N);
                        }
+                       if (scoreData.timestamp && scoreData.timestamp.N) {
+                         if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
+                           european.recentPlayers++;
+                         }
+                       }
                      }
                    }
 
@@ -108,7 +119,7 @@ module.exports = {
 
                      // Skip this if the tournament closed since they played
                      if (scoreData.timestamp && scoreData.timestamp.N &&
-                          (scoreData.timestamp.N > tournamentClose)) {
+                          (parseInt(scoreData.timestamp.N) > tournamentClose)) {
                        if (scoreData.spins && scoreData.spins.N) {
                          spins = parseInt(scoreData.spins.N);
                          tournament.spins += spins;
@@ -131,10 +142,12 @@ module.exports = {
          });
        }
       })(true, null).then(() => {
-        text = ('You have ' + american.players + ' people who have done ' + american.spins + ' total spins on an American wheel with a high score of ' + american.high + ' units.\r\n');
-        text += ('You have ' + european.players + ' people who have done ' + european.spins + ' total spins on a European wheel with a high score of ' + european.high + ' units.\r\n');
+        text = ('You have ' + american.players + ' players on an American wheel, ' + american.recentPlayers + ' of whom have played in the last 24 hours. ');
+        text += ('In total they have done ' + american.spins + ' spins with a high score of ' + american.high + ' units.\r\n\r\n');
+        text += ('You have ' + european.players + ' players on a European wheel, ' + european.recentPlayers + ' of whom have played in the last 24 hours. ');
+        text += ('In total they have done ' + european.spins + ' spins with a high score of ' + european.high + ' units.\r\n\r\n');
         text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
-        text += ('There are ' + newFormat + ' people on new-style attributes and ' + oldFormat + ' people with old-style attributes.\r\n');
+        text += ('There are ' + newFormat + ' people on new-style attributes and ' + oldFormat + ' people with old-style attributes.\r\n\r\n');
         text += utils.getAdText(adsPlayed);
         callback(text);
       }).catch((err) => {
@@ -280,7 +293,7 @@ function getRankFromDB(callback) {
 
                 // Only count tournament scores that are still active
                 if (scoreData.timestamp && scoreData.timestamp.N &&
-                    (scoreData.timestamp.N > tournamentClose)) {
+                    (parseInt(scoreData.timestamp.N) > tournamentClose)) {
                   const spins = (scoreData.spins && scoreData.spins.N)
                         ? parseInt(scoreData.spins.N) : 0;
                   const high = (scoreData.bankroll && scoreData.bankroll.N)
