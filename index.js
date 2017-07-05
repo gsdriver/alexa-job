@@ -7,6 +7,7 @@
 const roulette = require('./roulette');
 const blackjack = require('./blackjack');
 const slotmachine = require('./slotmachine');
+const utils = require('./utils');
 const AWS = require('aws-sdk');
 AWS.config.update({
   accessKeyId: process.env.accessKeyId,
@@ -50,6 +51,7 @@ function sendEmail(text, callback) {
 if (process.env.RUNLOOP) {
   let mailSent;
   let closedTournament;
+  let loggedNewUsers;
 
   // Get the ranks every 5 minutes and write to S3 if successful
   setInterval(() => {
@@ -104,6 +106,17 @@ if (process.env.RUNLOOP) {
     } else {
       // Not Friday at 1:00, so reset flag
       closedTournament = false;
+    }
+
+    // And save the number of new users every day at midnight
+    if ((d.getHours() % 24) == 0) {
+      if (!loggedNewUsers) {
+        loggedNewUsers = true;
+        utils.saveNewUsers('RouletteWheel', 'roulette');
+      }
+    } else {
+      // Past midnight hour, so reset flag
+      loggedNewUsers = false;
     }
   }, 1000*60*5);
 }
