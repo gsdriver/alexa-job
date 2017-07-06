@@ -113,6 +113,7 @@ if (process.env.RUNLOOP) {
       if (!loggedNewUsers) {
         loggedNewUsers = true;
         utils.saveNewUsers('RouletteWheel', 'roulette');
+        utils.saveNewUsers('PlayBlackjack', 'blackjack');
       }
     } else {
       // Past midnight hour, so reset flag

@@ -27,7 +27,14 @@ module.exports = {
 
         for (i = 0; i < results.length; i++) {
           if (!games[results[i].game]) {
-            games[results[i].game] = {players: 0, totalSpins: 0, totalJackpots: 0, maxSpins: 0, recentGames: 0};
+            games[results[i].game] = {
+              players: 0,
+              totalSpins: 0,
+              totalJackpots: 0,
+              maxSpins: 0,
+              recentGames: 0,
+            };
+
             numGames++;
           }
 
