@@ -48,7 +48,8 @@ module.exports = {
     return text;
   },
   saveNewUsers: function() {
-    const details = {roulette: 0, blackjack: 0, slots: 0};
+    const now = Date.now();
+    const details = {roulette: 0, blackjack: 0, slots: 0, timestamp: now};
 
     // Read from the databases
     dynamodb.getItem({TableName: 'RouletteWheel', Key: {userId: {S: 'game'}}},
@@ -67,7 +68,7 @@ module.exports = {
                 // Now write to S3
                 const params = {Body: JSON.stringify(details),
                   Bucket: 'garrett-alexa-usage',
-                  Key: 'newusers/' + Date.now() + '.txt'};
+                  Key: 'newusers/' + now + '.txt'};
 
                 s3.putObject(params, (err, data) => {});
 
