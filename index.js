@@ -112,9 +112,7 @@ if (process.env.RUNLOOP) {
     if ((d.getHours() % 24) == 0) {
       if (!loggedNewUsers) {
         loggedNewUsers = true;
-        utils.saveNewUsers('RouletteWheel', 'roulette');
-        utils.saveNewUsers('PlayBlackjack', 'blackjack');
-        utils.saveNewUsers('Slots', 'slots');
+        utils.saveNewUsers();
       }
     } else {
       // Past midnight hour, so reset flag
