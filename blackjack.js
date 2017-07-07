@@ -50,8 +50,8 @@ module.exports = {
           if (results[i].hands) {
             hands += results[i].hands;
           }
-          if (results[i].high && (results[i].high > high)) {
-            high = results[i].high;
+          if (results[i].bankroll && (results[i].bankroll > high)) {
+            high = results[i].bankroll;
           }
           if (results[i].timestamp &&
             ((now - results[i].timestamp) < 24*60*60*1000)) {
@@ -85,15 +85,15 @@ module.exports = {
         let i;
 
         for (i = 0; i < results.length; i++) {
-          if (results[i].high) {
-            scores.standard.push(results[i].high);
+          if (results[i].bankroll) {
+            scores.standard.push(results[i].bankroll);
           }
         }
 
         scores.standard.sort((a, b) => (b - a));
         scoreData.scores = scores;
 
-        // Only write high scores to S3 if they have changed
+        // Only write bankroll to S3 if it has changed
         checkScoreChange(scoreData.scores, (diff) => {
           if (diff != 'same') {
             // It's not the same, so try to write it out
@@ -143,9 +143,9 @@ function getEntriesFromDB(callback) {
              entry.nonService = true;
              if (standardGame.hands && standardGame.hands.N) {
                entry.hands = parseInt(standardGame.hands.N);
-             }
-             if (standardGame.high && standardGame.high.N) {
-               entry.high = parseInt(standardGame.high.N);
+               if (standardGame.bankroll && standardGame.bankroll.N) {
+                 entry.bankroll = parseInt(standardGame.bankroll.N);
+               }
              }
              if (standardGame.timestamp && standardGame.timestamp.N) {
                entry.timestamp = parseInt(standardGame.timestamp.N);
