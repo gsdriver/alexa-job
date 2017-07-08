@@ -143,12 +143,17 @@ function getEntriesFromDB(callback) {
              entry.nonService = true;
              if (standardGame.hands && standardGame.hands.N) {
                entry.hands = parseInt(standardGame.hands.N);
-               if (standardGame.bankroll && standardGame.bankroll.N) {
-                 entry.bankroll = parseInt(standardGame.bankroll.N);
-               }
              }
              if (standardGame.timestamp && standardGame.timestamp.N) {
                entry.timestamp = parseInt(standardGame.timestamp.N);
+             }
+             // Only count bankroll if it looks like they played
+             if (standardGame.bankroll && standardGame.bankroll.N) {
+               const bankroll = parseInt(standardGame.bankroll.N);
+
+               if (entry.hands || (bankroll !== 5000)) {
+                 entry.bankroll = parseInt(standardGame.bankroll.N);
+               }
              }
            }
            results.push(entry);
