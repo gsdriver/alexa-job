@@ -7,6 +7,7 @@
 const roulette = require('./roulette');
 const blackjack = require('./blackjack');
 const slotmachine = require('./slotmachine');
+const videopoker = require('./videopoker');
 const utils = require('./utils');
 const AWS = require('aws-sdk');
 AWS.config.update({
@@ -59,6 +60,7 @@ if (process.env.RUNLOOP) {
     roulette.updateRouletteScores();
     slotmachine.updateSlotMachineScores();
     blackjack.updateBlackjackScores();
+    videopoker.updatePokerScores();
 
     // Send mail around 5 AM and 5 PM
     const d = new Date();
