@@ -5,6 +5,8 @@
 'use strict';
 
 const fs = require('fs');
+const contentDir = 'content/newusers';
+const csvFile = contentDir + '/summary.csv';
 
 // Read every file from the content directory
 function readFiles(dirname, callback) {
@@ -40,8 +42,13 @@ function getFormattedDate(date) {
   return month + '/' + day + '/' + year;
 }
 
+// Delete the csv file if it exists
+if (fs.existsSync(csvFile)) {
+  fs.unlinkSync(csvFile);
+}
+
 // Read files and write to a CSV file
-readFiles('content/newusers', (err, results) => {
+readFiles(contentDir, (err, results) => {
   if (err) {
     console.log(err);
   } else {
@@ -52,7 +59,7 @@ readFiles('content/newusers', (err, results) => {
       text += getFormattedDate(new Date(result.timestamp)) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + '\n';
     });
 
-    fs.writeFile('content/newusers/summary.csv', text, (err) => {
+    fs.writeFile(csvFile, text, (err) => {
       if (err) {
         console.log(err);
       }
