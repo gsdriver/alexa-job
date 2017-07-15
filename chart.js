@@ -55,6 +55,7 @@ readFiles(contentDir, (err, results) => {
     // Now go through each result and write to a CSV file
     let text = 'Date,Roulette,Blackjack,Slots\n';
 
+    results.sort((a, b) => (a.timestamp - b.timestamp));
     results.forEach((result) => {
       text += getFormattedDate(new Date(result.timestamp)) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + '\n';
     });
