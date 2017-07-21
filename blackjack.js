@@ -29,17 +29,12 @@ module.exports = {
         let high = 0;
         let recentGames = 0;
         const now = Date.now();
-        let noplay = 0;
 
         for (i = 0; i < results.length; i++) {
           if (players[results[i].locale]) {
             players[results[i].locale]++;
           } else {
             players[results[i].locale] = 1;
-          }
-
-          if (!results[i].numRounds) {
-            noplay++;
           }
 
           totalRounds += results[i].numRounds;
@@ -67,9 +62,8 @@ module.exports = {
         // Get the progressive information for standard
         getProgressive('standard', (game, progressiveHands, jackpots) => {
           text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service. ';
-          text += recentGames + ' have played in the past 24 hours and ' + noplay + ' haven\'t played any hands. ';
+          text += recentGames + ' have played in the past 24 hours. ';
           text += 'There are ' + players['en-US'] + ' American players and ' + players['en-GB'] + ' UK players. ';
-          text += 'and ' + (players['de-DE'] ? players['de-DE'] : 'no') + ' German.\r\n';
           text += ('There have been a total of ' + totalRounds + ' sessions played.\r\n');
           text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
           text += multiplePlays + ' people have played more than one round. ' + maxRounds + ' is the most rounds played by one person.\r\n';
