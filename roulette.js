@@ -52,8 +52,8 @@ module.exports = {
                      if (spins) {
                        american.players++;
                      }
-                     if (parseInt(score.highAmerican.N) > american.high) {
-                       american.high = parseInt(score.highAmerican.N);
+                     if (parseInt(score.currentAmerican.N) > american.high) {
+                       american.high = parseInt(score.currentAmerican.N);
                      }
                    }
 
@@ -63,8 +63,8 @@ module.exports = {
                      if (spins) {
                        european.players++;
                      }
-                     if (parseInt(score.highEuropean.N) > european.high) {
-                       european.high = parseInt(score.highEuropean.N);
+                     if (parseInt(score.currentEuropean.N) > european.high) {
+                       european.high = parseInt(score.currentEuropean.N);
                      }
                    }
                  } else {
@@ -81,8 +81,8 @@ module.exports = {
                        if (spins) {
                          american.players++;
                        }
-                       if (parseInt(scoreData.high.N) > american.high) {
-                         american.high = parseInt(scoreData.high.N);
+                       if (parseInt(scoreData.bankroll.N) > american.high) {
+                         american.high = parseInt(scoreData.bankroll.N);
                        }
                        if (scoreData.timestamp && scoreData.timestamp.N) {
                          if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
@@ -102,8 +102,8 @@ module.exports = {
                        if (spins) {
                          european.players++;
                        }
-                       if (parseInt(scoreData.high.N) > european.high) {
-                         european.high = parseInt(scoreData.high.N);
+                       if (parseInt(scoreData.bankroll.N) > european.high) {
+                         european.high = parseInt(scoreData.bankroll.N);
                        }
                        if (scoreData.timestamp && scoreData.timestamp.N) {
                          if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
@@ -247,10 +247,10 @@ function getRankFromDB(callback) {
                       ? parseInt(score.spinsAmerican.N) : 0;
                 const spinsEuropean = (score.spinsEuropean && score.spinsEuropean.N)
                       ? parseInt(score.spinsEuropean.N) : 0;
-                const highAmerican = (score.highAmerican && score.highAmerican.N)
-                      ? parseInt(score.highAmerican.N) : 0;
-                const highEuropean = (score.highEuropean && score.highEuropean.N)
-                  ? parseInt(score.highEuropean.N) : 0;
+                const highAmerican = (score.currentAmerican && score.currentAmerican.N)
+                      ? parseInt(score.currentAmerican.N) : 0;
+                const highEuropean = (score.currentEuropean && score.currentEuropean.N)
+                  ? parseInt(score.currentEuropean.N) : 0;
 
                  if (spinsAmerican) {
                    americanScores.push(highAmerican);
@@ -266,8 +266,8 @@ function getRankFromDB(callback) {
                 scoreData = data.Items[i].mapAttr.M.american.M;
                 const spins = (scoreData.spins && scoreData.spins.N)
                       ? parseInt(scoreData.spins.N) : 0;
-                const high = (scoreData.high && scoreData.high.N)
-                      ? parseInt(scoreData.high.N) : 0;
+                const high = (scoreData.bankroll && scoreData.bankroll.N)
+                      ? parseInt(scoreData.bankroll.N) : 0;
 
                 if (spins) {
                   americanScores.push(high);
@@ -279,8 +279,8 @@ function getRankFromDB(callback) {
                 scoreData = data.Items[i].mapAttr.M.european.M;
                 const spins = (scoreData.spins && scoreData.spins.N)
                       ? parseInt(scoreData.spins.N) : 0;
-                const high = (scoreData.high && scoreData.high.N)
-                      ? parseInt(scoreData.high.N) : 0;
+                const high = (scoreData.bankroll && scoreData.bankroll.N)
+                      ? parseInt(scoreData.bankroll.N) : 0;
 
                 if (spins) {
                   europeanScores.push(high);
