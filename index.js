@@ -73,15 +73,17 @@ if (process.env.RUNLOOP) {
         blackjack.getBlackjackMail((bjText) => {
           slotmachine.getSlotsMail((slotText) => {
             roulette.getRouletteMail((rouletteText) => {
-              const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText;
+              videopoker.getPokerMail((pokerText) => {
+                const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText;
 
-              console.log(mailBody);
-              sendEmail(mailBody, (err, data) => {
-                if (err) {
-                  console.log('Error sending mail ' + err);
-                } else {
-                  console.log('Mail sent!');
-                }
+                console.log(mailBody);
+                sendEmail(mailBody, (err, data) => {
+                  if (err) {
+                    console.log('Error sending mail ' + err);
+                  } else {
+                    console.log('Mail sent!');
+                  }
+                });
               });
             });
           });
@@ -127,9 +129,11 @@ if (process.env.SINGLERUN) {
   blackjack.getBlackjackMail((bjText) => {
     slotmachine.getSlotsMail((slotText) => {
       roulette.getRouletteMail((rouletteText) => {
-        const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText;
+        videopoker.getPokerMail((pokerText) => {
+          const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText;
 
-        console.log(mailBody);
+          console.log(mailBody);
+        });
       });
     });
   });
