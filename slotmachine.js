@@ -31,6 +31,7 @@ module.exports = {
               players: 0,
               totalSpins: 0,
               totalJackpots: 0,
+              highScore: 0,
               maxSpins: 0,
               recentGames: 0,
             };
@@ -52,6 +53,9 @@ module.exports = {
           if (results[i].spins > thisGame.maxSpins) {
             thisGame.maxSpins = results[i].spins;
           }
+          if (results[i].high > thisGame.highScore) {
+            thisGame.highScore = results[i].high;
+          }
         }
 
         // Get the progressive jackpot
@@ -63,6 +67,7 @@ module.exports = {
               text += 'For ' + game + ' there are ' + games[game].players + ' total players ';
               text += 'of whom ' + games[game].recentGames + ' have played in the past 24 hours.  ';
               text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
+              text += ('The high score is ' + games[game].highScore + ' coins. ');
 
               if (coins && (coins > 0)) {
                 text += ('There are ' + coins + ' coins towards the next progressive jackpot. ');
@@ -182,8 +187,8 @@ function getEntryForGame(item, game) {
 
        entry = {game: game};
        entry.spins = isNaN(spins) ? 0 : spins;
-       if (item.mapAttr.M[game].M.high) {
-         const high = parseInt(item.mapAttr.M[game].M.high.N);
+       if (item.mapAttr.M[game].M.bankroll) {
+         const high = parseInt(item.mapAttr.M[game].M.bankroll.N);
          entry.high = isNaN(high) ? 0 : high;
        }
 
