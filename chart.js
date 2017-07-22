@@ -57,7 +57,9 @@ readFiles(contentDir, (err, results) => {
 
     results.sort((a, b) => (a.timestamp - b.timestamp));
     results.forEach((result) => {
-      text += getFormattedDate(new Date(result.timestamp)) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + '\n';
+      const recordDate = new Date(result.timestamp);
+      recordDate.setDate(recordDate.getDate() - 1);
+      text += getFormattedDate(recordDate) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + '\n';
     });
 
     fs.writeFile(csvFile, text, (err) => {
