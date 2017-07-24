@@ -25,9 +25,12 @@ module.exports = {
         let i;
         const players = {};
         let nonService = 0;
-        let hands = 0;
-        let high = 0;
-        let recentGames = 0;
+        let standardHands = 0;
+        let tournamentHands = 0;
+        let standardHigh = 0;
+        let standardRecent = 0;
+        let tournamentHigh = 0;
+        let tournamentRecent = 0;
         const now = Date.now();
 
         for (i = 0; i < results.length; i++) {
@@ -47,27 +50,46 @@ module.exports = {
           if (results[i].nonService) {
             nonService++;
           }
-          if (results[i].hands) {
-            hands += results[i].hands;
+
+          if (results[i].standard) {
+            const standard = results[i].standard;
+            if (standard.hands) {
+              standardHands += standard.hands;
+            }
+            if (standard.bankroll && (standard.bankroll > standardHigh)) {
+              standardHigh = standard.bankroll;
+            }
+            if (standard.timestamp &&
+              ((now - standard.timestamp) < 24*60*60*1000)) {
+              standardRecent++;
+            }
           }
-          if (results[i].bankroll && (results[i].bankroll > high)) {
-            high = results[i].bankroll;
-          }
-          if (results[i].timestamp &&
-            ((now - results[i].timestamp) < 24*60*60*1000)) {
-            recentGames++;
+
+          if (results[i].tournament) {
+            const tournament = results[i].tournament;
+            if (tournament.hands) {
+              tournamentHands += tournament.hands;
+            }
+            if (tournament.bankroll && (tournament.bankroll > tournamentHigh)) {
+              tournamentHigh = tournament.bankroll;
+            }
+            if (tournament.timestamp &&
+              ((now - tournament.timestamp) < 24*60*60*1000)) {
+              tournamentRecent++;
+            }
           }
         }
 
         // Get the progressive information for standard
         getProgressive('standard', (game, progressiveHands, jackpots) => {
           text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service. ';
-          text += recentGames + ' have played in the past 24 hours. ';
+          text += standardRecent + ' have played in the past 24 hours. ';
           text += 'There are ' + players['en-US'] + ' American players and ' + players['en-GB'] + ' UK players. ';
           text += ('There have been a total of ' + totalRounds + ' sessions played.\r\n');
           text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
           text += multiplePlays + ' people have played more than one round. ' + maxRounds + ' is the most rounds played by one person.\r\n';
-          text += ('Since moving off the service, there have been ' + hands + ' hands played. The high score is $' + high + '.\r\n');
+          text += ('Since moving off the service, there have been ' + standardHands + ' hands played. The high score is $' + standardHigh + '.\r\n');
+          text += (tournamentRecent + ' people have played the tournament in the past 24 hours, with ' + tournamentHands + ' played and a high score of $' + tournamentHigh + '.\r\n');
           text += utils.getAdText(newads);
           callback(text);
         });
@@ -78,17 +100,21 @@ module.exports = {
     getEntriesFromDB((err, results, newads) => {
       if (!err) {
         const scoreData = {timestamp: Date.now()};
-        // Only support standard for now
-        const scores = {standard: []};
+        // Only support standard and tournament for now
+        const scores = {standard: [], tournament: []};
         let i;
 
         for (i = 0; i < results.length; i++) {
-          if (results[i].bankroll) {
-            scores.standard.push(results[i].bankroll);
+          if (results[i].standard && results[i].standard.bankroll) {
+            scores.standard.push(results[i].standard.bankroll);
+          }
+          if (results[i].tournament && results[i].tournament.bankroll) {
+            scores.tournament.push(results[i].tournament.bankroll);
           }
         }
 
         scores.standard.sort((a, b) => (b - a));
+        scores.tournament.sort((a, b) => (b - a));
         scoreData.scores = scores;
 
         // Only write bankroll to S3 if it has changed
@@ -138,22 +164,43 @@ function getEntriesFromDB(callback) {
            if (data.Items[i].mapAttr.M.standard && data.Items[i].mapAttr.M.standard.M) {
              const standardGame = data.Items[i].mapAttr.M.standard.M;
 
+             entry.standard = {};
              entry.nonService = true;
              if (standardGame.hands && standardGame.hands.N) {
-               entry.hands = parseInt(standardGame.hands.N);
+               entry.standard.hands = parseInt(standardGame.hands.N);
              }
              if (standardGame.timestamp && standardGame.timestamp.N) {
-               entry.timestamp = parseInt(standardGame.timestamp.N);
+               entry.standard.timestamp = parseInt(standardGame.timestamp.N);
              }
              // Only count bankroll if it looks like they played
              if (standardGame.bankroll && standardGame.bankroll.N) {
                const bankroll = parseInt(standardGame.bankroll.N);
 
-               if (entry.hands || (bankroll !== 5000)) {
-                 entry.bankroll = parseInt(standardGame.bankroll.N);
+               if (entry.standard.hands || (bankroll !== 5000)) {
+                 entry.standard.bankroll = parseInt(standardGame.bankroll.N);
                }
              }
            }
+
+          if (data.Items[i].mapAttr.M.tournament && data.Items[i].mapAttr.M.tournament.M) {
+            const tournament = data.Items[i].mapAttr.M.tournament.M;
+
+            entry.tournament = {};
+            if (tournament.hands && tournament.hands.N) {
+              entry.tournament.hands = parseInt(tournament.hands.N);
+            }
+            if (tournament.timestamp && tournament.timestamp.N) {
+              entry.tournament.timestamp = parseInt(tournament.timestamp.N);
+            }
+            // Only count bankroll if it looks like they played
+            if (tournament.bankroll && tournament.bankroll.N) {
+              const bankroll = parseInt(tournament.bankroll.N);
+
+              if (entry.hands || (bankroll !== 5000)) {
+                entry.tournament.bankroll = parseInt(tournament.bankroll.N);
+              }
+            }
+          }
            results.push(entry);
          }
        }
