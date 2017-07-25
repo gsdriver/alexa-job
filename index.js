@@ -51,7 +51,8 @@ function sendEmail(text, callback) {
 
 if (process.env.RUNLOOP) {
   let mailSent;
-  let closedTournament;
+  let closedRouletteTournament;
+  let closedBlackjackTournament;
   let loggedNewUsers;
 
   // Get the ranks every 5 minutes and write to S3 if successful
@@ -94,11 +95,11 @@ if (process.env.RUNLOOP) {
       mailSent = false;
     }
 
-    // And close the tournament down on Fridays after 1 AM
+    // Close the roulette tournament down on Fridays after 1 AM
     if ((d.getDay() == 5) && (d.getHours() == 1)) {
-      if (!closedTournament) {
+      if (!closedRouletteTournament) {
         // First time in this hour!
-        closedTournament = true;
+        closedRouletteTournament = true;
         roulette.closeTournament((err) => {
           if (err) {
             console.log('Closing error: ' + err);
@@ -109,7 +110,25 @@ if (process.env.RUNLOOP) {
       }
     } else {
       // Not Friday at 1:00, so reset flag
-      closedTournament = false;
+      closedRouletteTournament = false;
+    }
+
+    // Close the blackjack tournament down on Wednesdays after 1 AM
+    if ((d.getDay() == 3) && (d.getHours() == 1)) {
+      if (!closedBlackjackTournament) {
+        // First time in this hour!
+        closedBlackjackTournament = true;
+        blackjack.closeTournament((err) => {
+          if (err) {
+            console.log('Closing error: ' + err);
+          } else {
+            console.log('Closed tournament!');
+          }
+        });
+      }
+    } else {
+      // Not Wednesday at 1:00, so reset flag
+      closedBlackjackTournament = false;
     }
 
     // And save the number of new users every day at midnight
