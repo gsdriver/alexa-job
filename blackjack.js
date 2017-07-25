@@ -143,10 +143,18 @@ module.exports = {
         // What's the high score?
         let highScore = 1;
         let i;
+        let players = 0;
+        let hands = 0;
 
         for (i = 0; i < results.length; i++) {
-          if (results[i].tournament && (results[i].tournament.bankroll > highScore)) {
-            highScore = results[i].tournament.bankroll;
+          if (results[i].tournament) {
+            players++;
+            if (results[i].tournament.hands) {
+              hands += results[i].tournament.hands;
+            }
+            if (results[i].tournament.bankroll > highScore) {
+              highScore = results[i].tournament.bankroll;
+            }
           }
         }
 
@@ -157,7 +165,7 @@ module.exports = {
           } else {
             const results = JSON.parse(data.Body.toString('ascii'));
 
-            results.push({timestamp: Date.now(), highScore: highScore});
+            results.push({timestamp: Date.now(), highScore: highScore, players: players, hands: hands});
             results.sort((a, b) => (a.timestamp - b.timestamp));
             const params = {Body: JSON.stringify(results),
               Bucket: 'garrett-alexa-usage',
