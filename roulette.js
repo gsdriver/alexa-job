@@ -186,11 +186,15 @@ module.exports = {
     });
   },
   closeTournament: function(callback) {
-    getRankFromDB((err, americanScores, europeanScores, tournamentScores) => {
+    getRankFromDB((err, americanScores, europeanScores, tournamentScores, tournamentSpins) => {
       if (err) {
         callback(err);
       } else {
         const highScore = (tournamentScores && tournamentScores[0]) ? tournamentScores[0] : 1;
+        const players = (tournamentScores ? tournamentScores.length : 0);
+        let spins = 0;
+
+        tournamentSpins.map((spin) => spins += spin);
 
         // Now get the list of completed tournaments to add to
         s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'RouletteTournamentResults.txt'}, (err, data) => {
@@ -199,7 +203,7 @@ module.exports = {
           } else {
             const results = JSON.parse(data.Body.toString('ascii'));
 
-            results.push({timestamp: Date.now(), highScore: highScore});
+            results.push({timestamp: Date.now(), highScore: highScore, players: players, spins: spins});
             results.sort((a, b) => (a.timestamp - b.timestamp));
             const params = {Body: JSON.stringify(results),
               Bucket: 'garrett-alexa-usage',
@@ -220,6 +224,7 @@ function getRankFromDB(callback) {
   const americanScores = [];
   const europeanScores = [];
   const tournamentScores = [];
+  const tournamentSpins = [];
   let scoreData;
 
   // First find the last tournament close time
@@ -301,6 +306,7 @@ function getRankFromDB(callback) {
 
                   if (spins) {
                     tournamentScores.push(high);
+                    tournamentSpins.push(spins);
                   }
                 }
               }
@@ -316,7 +322,8 @@ function getRankFromDB(callback) {
       americanScores.sort((a, b) => (b-a));
       europeanScores.sort((a, b) => (b-a));
       tournamentScores.sort((a, b) => (b-a));
-      callback(null, americanScores, europeanScores, tournamentScores);
+      tournamentSpins.sort((a, b) => (b-a));
+      callback(null, americanScores, europeanScores, tournamentScores, tournamentSpins);
     }).catch((err) => {
       console.log('Error scanning: ' + err);
       callback(err, null, null, null);
