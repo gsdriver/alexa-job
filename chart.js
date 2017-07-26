@@ -59,7 +59,7 @@ readFiles(contentDir, (err, results) => {
     results.forEach((result) => {
       const recordDate = new Date(result.timestamp);
       recordDate.setDate(recordDate.getDate() - 1);
-      if (result.poker) {
+      if (result.poker !== undefined) {
         text += getFormattedDate(recordDate) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + ',' + result.poker + '\n';
       } else {
         text += getFormattedDate(recordDate) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + '\n';
