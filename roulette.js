@@ -16,6 +16,8 @@ module.exports = {
     const american = {high: 0, spins: 0, players: 0, recentPlayers: 0};
     const european = {high: 0, spins: 0, players: 0, recentPlayers: 0};
     const tournament = {high: 0, spins: 0, players: 0};
+    const surveyResults = {accepted: 0, declined: 0, tournamentYes: 0, tournamentNo: 0,
+          leaderYes: 0, leaderNo: 0, otherYes: 0, otherNo: 0};
     const adsPlayed = {};
     let spins;
     let text;
@@ -39,6 +41,39 @@ module.exports = {
             utils.getAdSummary(data, adsPlayed);
             for (i = 0; i < data.Items.length; i++) {
                if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
+                 // Were they offered the survey?
+                 if (data.Items[i].mapAttr.M.survey) {
+                   const survey = data.Items[i].mapAttr.M.survey.M;
+
+                   if (survey.accepted) {
+                     surveyResults.accepted++;
+                   }
+                   if (survey.declined) {
+                     surveyResults.declined++;
+                   }
+                   if (survey.SURVEY_QUESTION_TOURNAMENT) {
+                     if (survey.SURVEY_QUESTION_TOURNAMENT.BOOL) {
+                       surveyResults.tournamentYes++;
+                     } else {
+                       surveyResults.tournamentNo++;
+                     }
+                   }
+                   if (survey.SURVEY_QUESTION_LEADERBOARD) {
+                     if (survey.SURVEY_QUESTION_LEADERBOARD.BOOL) {
+                       surveyResults.leaderYes++;
+                     } else {
+                       surveyResults.leaderNo++;
+                     }
+                   }
+                   if (survey.SURVEY_QUESTION_OTHERGAMES) {
+                     if (survey.SURVEY_QUESTION_OTHERGAMES.BOOL) {
+                       surveyResults.otherYes++;
+                     } else {
+                       surveyResults.otherNo++;
+                     }
+                   }
+                 }
+
                  if (data.Items[i].mapAttr.M.highScore
                       && data.Items[i].mapAttr.M.highScore.M) {
                    // This is the old format
@@ -148,6 +183,10 @@ module.exports = {
         text += ('In total they have done ' + european.spins + ' spins with a high score of ' + european.high + ' units.\r\n\r\n');
         text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
         text += ('There are ' + newFormat + ' people on new-style attributes and ' + oldFormat + ' people with old-style attributes.\r\n\r\n');
+        text += (surveyResults.accepted + ' people have taken the survey and ' + surveyResults.declined + ' passed on the survey. ');
+        text += (surveyResults.tournamentYes + ' out of ' + (surveyResults.tournamentYes + surveyResults.tournamentNo) + ' people answered yes to the tournament question. ');
+        text += (surveyResults.leaderYes + ' out of ' + (surveyResults.leaderYes + surveyResults.leaderNo) + ' people answered yes to the leader board question. ');
+        text += (surveyResults.otherYes + ' out of ' + (surveyResults.otherYes + surveyResults.otherNo) + ' people answered yes to the other games question.\r\n\r\n');
         text += utils.getAdText(adsPlayed);
         callback(text);
       }).catch((err) => {
@@ -203,7 +242,8 @@ module.exports = {
           } else {
             const results = JSON.parse(data.Body.toString('ascii'));
 
-            results.push({timestamp: Date.now(), highScore: highScore, players: players, spins: spins});
+            results.push({timestamp: Date.now(), highScore: highScore,
+                  players: players, spins: spins});
             results.sort((a, b) => (a.timestamp - b.timestamp));
             const params = {Body: JSON.stringify(results),
               Bucket: 'garrett-alexa-usage',
