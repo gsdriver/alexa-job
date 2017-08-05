@@ -5,8 +5,8 @@
 'use strict';
 
 const fs = require('fs');
-const logDir = 'content/logs/roulette';
-const resultFile = logDir + '/summary.csv';
+let logDir;
+let resultFile;
 
 // Read every file from the content directory
 function readFiles(dirname, callback) {
@@ -37,6 +37,14 @@ function readFiles(dirname, callback) {
   });
 }
 
+if (process.argv.length !== 3) {
+  console.log('You need to specify which skill you want to process logs for.');
+  return;
+}
+
+logDir = 'content/logs/' + process.argv[2];
+resultFile = logDir + '/summary.csv';
+
 // Delete the output file if it exists
 if (fs.existsSync(resultFile)) {
   fs.unlinkSync(resultFile);
@@ -54,15 +62,15 @@ readFiles(logDir, (err, results) => {
 
     results.forEach((result) => {
       const data = {
-        sessionId: result.request.session.sessionId,
+        sessionId: result.event.session.sessionId,
         timestamp: result.timestamp,
-        intent: (result.request.request.type === 'IntentRequest')
-          ? result.request.request.intent.name
-          : result.request.request.type,
+        intent: (result.event.request.type === 'IntentRequest')
+          ? result.event.request.intent.name
+          : result.event.request.type,
         response: result.response};
 
-      if (result.request.request.intent && result.request.request.intent.slots) {
-        data.slots = result.request.request.intent.slots;
+      if (result.event.request.intent && result.event.request.intent.slots) {
+        data.slots = result.event.request.intent.slots;
       }
 
       processed.push(data);
