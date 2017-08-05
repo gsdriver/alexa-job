@@ -49,6 +49,42 @@ function sendEmail(text, callback) {
   SES.sendEmail(params, callback);
 }
 
+function getMailText(callback) {
+  let toRun = 4;
+  let bjText;
+  let slotText;
+  let rouletteText;
+  let pokerText;
+
+  blackjack.getBlackjackMail((text) => {
+    bjText = text;
+    completed();
+  });
+
+  slotmachine.getSlotsMail((text) => {
+    slotText = text;
+    completed();
+  });
+
+  roulette.getRouletteMail((text) => {
+    rouletteText = text;
+    completed();
+  });
+
+  videopoker.getPokerMail((text) => {
+    pokerText = text;
+    completed();
+  });
+
+  function completed() {
+    toRun--;
+    if (toRun === 0) {
+      const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText;
+      callback(mailBody);
+    }
+  }
+}
+
 if (process.env.RUNLOOP) {
   let mailSent;
   let closedRouletteTournament;
@@ -71,22 +107,13 @@ if (process.env.RUNLOOP) {
       if (!mailSent) {
         // First time in this hour!
         mailSent = true;
-        blackjack.getBlackjackMail((bjText) => {
-          slotmachine.getSlotsMail((slotText) => {
-            roulette.getRouletteMail((rouletteText) => {
-              videopoker.getPokerMail((pokerText) => {
-                const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText;
-
-                console.log(mailBody);
-                sendEmail(mailBody, (err, data) => {
-                  if (err) {
-                    console.log('Error sending mail ' + err);
-                  } else {
-                    console.log('Mail sent!');
-                  }
-                });
-              });
-            });
+        getMailText((mailBody) => {
+          sendEmail(mailBody, (err, data) => {
+            if (err) {
+              console.log('Error sending mail ' + err);
+            } else {
+              console.log('Mail sent!');
+            }
           });
         });
       }
@@ -145,16 +172,8 @@ if (process.env.RUNLOOP) {
 }
 
 if (process.env.SINGLERUN) {
-  blackjack.getBlackjackMail((bjText) => {
-    slotmachine.getSlotsMail((slotText) => {
-      roulette.getRouletteMail((rouletteText) => {
-        videopoker.getPokerMail((pokerText) => {
-          const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText;
-
-          console.log(mailBody);
-        });
-      });
-    });
+  getMailText((mailBody) => {
+    console.log(mailBody);
   });
 }
 
