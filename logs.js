@@ -65,7 +65,7 @@ readFiles(logDir, (err, results) => {
         intent: (result.event.request.type === 'IntentRequest')
           ? result.event.request.intent.name
           : result.event.request.type,
-        response: (result.response) ? result.response : ''};
+        response: (result.response) ? result.response : 'NO RESPONSE'};
 
       if (result.event.request.intent && result.event.request.intent.slots) {
         data.slots = result.event.request.intent.slots;
