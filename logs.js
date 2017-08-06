@@ -5,8 +5,6 @@
 'use strict';
 
 const fs = require('fs');
-let logDir;
-let resultFile;
 
 // Read every file from the content directory
 function readFiles(dirname, callback) {
@@ -42,8 +40,8 @@ if (process.argv.length !== 3) {
   return;
 }
 
-logDir = 'content/logs/' + process.argv[2];
-resultFile = logDir + '/summary.csv';
+const logDir = 'content/logs/' + process.argv[2];
+const resultFile = logDir + '/summary.csv';
 
 // Delete the output file if it exists
 if (fs.existsSync(resultFile)) {
@@ -82,9 +80,11 @@ readFiles(logDir, (err, results) => {
 
     processed.forEach((result) => {
       if (!sessions[result.sessionId]) {
-        sessions[result.sessionId] = [];
+        sessions[result.sessionId] = {};
+        sessions[result.sessionId].timestamp = result.timestamp;
+        sessions[result.sessionId].sessions = [];
       }
-      sessions[result.sessionId].push({intent: result.intent,
+      sessions[result.sessionId].sessions.push({intent: result.intent,
                 slots: result.slots, response: result.response});
     });
 
@@ -94,8 +94,8 @@ readFiles(logDir, (err, results) => {
 
     for (session in sessions) {
       if (session) {
-        text += (session) + '\n';
-        sessions[session].forEach((result) => {
+        text += (new Date(sessions[session].timestamp)).toString() + '\n';
+        sessions[session].sessions.forEach((result) => {
           text += ',"' + result.intent + '","';
           if (result.slots) {
             text += JSON.stringify(result.slots).replace(/"/g, '""');
