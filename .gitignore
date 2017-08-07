@@ -4,3 +4,4 @@ alexa-job.zip
 build
 content
 .elasticbeanstalk
+log*.csv

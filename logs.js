@@ -17,7 +17,7 @@ const options = {
     keyPrefix: process.argv[2] + '/',
   },
 };
-const resultFile = 'content/logs/' + process.argv[2] + '/summary.csv';
+const resultFile = 'log-' + process.argv[2] + '.csv';
 
 logger.processLogs(options, resultFile, (err) => {
   if (err) {
