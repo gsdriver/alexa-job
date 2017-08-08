@@ -16,8 +16,13 @@ const options = {
     bucket: 'garrett-alexa-logs',
     keyPrefix: process.argv[2] + '/',
   },
+  daterange: {
+  },
 };
 const resultFile = 'log-' + process.argv[2] + '.csv';
+
+const now = new Date();
+options.daterange.start = (new Date(now.getFullYear(), now.getMonth(), now.getDate())).valueOf();
 
 logger.processLogs(options, resultFile, (err) => {
   if (err) {
