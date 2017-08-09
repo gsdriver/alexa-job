@@ -203,8 +203,12 @@ function getEntriesFromDB(callback) {
            if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
              const entry = {};
 
-             entry.numRounds = parseInt(data.Items[i].mapAttr.M.numRounds.N);
-             entry.locale = data.Items[i].mapAttr.M.playerLocale.S;
+             if (data.Items[i].mapAttr.M.numRounds) {
+               entry.numRounds = parseInt(data.Items[i].mapAttr.M.numRounds.N);
+             }
+             if (data.Items[i].mapAttr.M.playerLocale) {
+               entry.locale = data.Items[i].mapAttr.M.playerLocale.S;
+             }
              entry.adplayed = (data.Items[i].mapAttr.M.adStamp != undefined);
              if (data.Items[i].mapAttr.M.standard && data.Items[i].mapAttr.M.standard.M) {
                const standardGame = data.Items[i].mapAttr.M.standard.M;
