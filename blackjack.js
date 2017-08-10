@@ -135,7 +135,10 @@ module.exports = {
           } else {
             const results = JSON.parse(data.Body.toString('ascii'));
 
-            results.push({timestamp: Date.now(), highScore: highScore, players: players, hands: hands});
+            results.push({timestamp: Date.now(),
+              highScore: highScore,
+              players: players,
+              hands: hands});
             results.sort((a, b) => (a.timestamp - b.timestamp));
             const params = {Body: JSON.stringify(results),
               Bucket: 'garrett-alexa-usage',
@@ -276,7 +279,7 @@ function checkScoreChange(newScores, callback) {
 
             for (i = 0; i < newLength; i++) {
               if ((scores[game][i].name != newScores[game][i].name)
-                && (scores[game][i].bankroll != newScores[game][i].bankroll)) {
+                || (scores[game][i].bankroll != newScores[game][i].bankroll)) {
                 callback('different');
                 return;
               }
