@@ -9,6 +9,7 @@ AWS.config.update({region: 'us-east-1'});
 const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
+const speechUtils = require('alexa-speech-utils')();
 
 module.exports = {
   // Generates the text for blackjack e-mail summary
@@ -19,19 +20,11 @@ module.exports = {
       if (err) {
         callback('Error getting blackjack data: ' + err);
       } else {
-        let totalRounds = 0;
-        let maxRounds = 0;
-        let multiplePlays = 0;
         let i;
         const players = {};
-        let nonService = 0;
-        let standardHands = 0;
-        let tournamentHands = 0;
-        let standardHigh = 0;
         let standardRecent = 0;
-        let tournamentHigh = 0;
-        let tournamentRecent = 0;
         const now = Date.now();
+        const registered = [];
 
         for (i = 0; i < results.length; i++) {
           if (players[results[i].locale]) {
@@ -40,56 +33,31 @@ module.exports = {
             players[results[i].locale] = 1;
           }
 
-          totalRounds += results[i].numRounds;
-          if (results[i].numRounds > maxRounds) {
-            maxRounds = results[i].numRounds;
-          }
-          if (results[i].numRounds > 1) {
-            multiplePlays++;
-          }
-          if (results[i].nonService) {
-            nonService++;
-          }
-
           if (results[i].standard) {
             const standard = results[i].standard;
-            if (standard.hands) {
-              standardHands += standard.hands;
-            }
-            if (standard.bankroll && (standard.bankroll > standardHigh)) {
-              standardHigh = standard.bankroll;
-            }
             if (standard.timestamp &&
               ((now - standard.timestamp) < 24*60*60*1000)) {
               standardRecent++;
             }
           }
 
-          if (results[i].tournament) {
-            const tournament = results[i].tournament;
-            if (tournament.hands) {
-              tournamentHands += tournament.hands;
-            }
-            if (tournament.bankroll && (tournament.bankroll > tournamentHigh)) {
-              tournamentHigh = tournament.bankroll;
-            }
-            if (tournament.timestamp &&
-              ((now - tournament.timestamp) < 24*60*60*1000)) {
-              tournamentRecent++;
-            }
+          if (results[i].firstName) {
+            registered.push(results[i].firstName);
           }
+        }
+
+        let registeredText = '';
+        if (registered.length) {
+          registeredText = 'The following individuals have registered: ' + speechUtils.and(registered) + '\r\n';
         }
 
         // Get the progressive information for standard
         getProgressive('standard', (game, progressiveHands, jackpots) => {
-          text = 'There are ' + results.length + ' registered players with ' + nonService + ' off the service. ';
+          text = 'Of ' + results.length + ' registered players ';
           text += standardRecent + ' have played in the past 24 hours. ';
           text += 'There are ' + players['en-US'] + ' American players and ' + players['en-GB'] + ' UK players. ';
-          text += ('There have been a total of ' + totalRounds + ' sessions played.\r\n');
           text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
-          text += multiplePlays + ' people have played more than one round. ' + maxRounds + ' is the most rounds played by one person.\r\n';
-          text += ('Since moving off the service, there have been ' + standardHands + ' hands played. The high score is $' + standardHigh + '.\r\n');
-          text += (tournamentRecent + ' people have played the tournament in the past 24 hours, with ' + tournamentHands + ' hands played and a high score of $' + tournamentHigh + '.\r\n');
+          text += registeredText;
           text += utils.getAdText(newads);
           callback(text);
         });
@@ -106,15 +74,17 @@ module.exports = {
 
         for (i = 0; i < results.length; i++) {
           if (results[i].standard && results[i].standard.bankroll) {
-            scores.standard.push(results[i].standard.bankroll);
+            scores.standard.push({name: results[i].firstName,
+                bankroll: results[i].standard.bankroll});
           }
           if (results[i].tournament && results[i].tournament.bankroll) {
-            scores.tournament.push(results[i].tournament.bankroll);
+            scores.tournament.push({name: results[i].firstName,
+                bankroll: results[i].tournament.bankroll});
           }
         }
 
-        scores.standard.sort((a, b) => (b - a));
-        scores.tournament.sort((a, b) => (b - a));
+        scores.standard.sort((a, b) => (b.bankroll - a.bankroll));
+        scores.tournament.sort((a, b) => (b.bankroll - a.bankroll));
         scoreData.scores = scores;
 
         // Only write bankroll to S3 if it has changed
@@ -123,7 +93,7 @@ module.exports = {
             // It's not the same, so try to write it out
             const params = {Body: JSON.stringify(scoreData),
               Bucket: 'garrett-alexa-usage',
-              Key: 'BlackjackScores.txt'};
+              Key: 'BlackjackScores2.txt'};
 
             s3.putObject(params, (err, data) => {
               if (err) {
@@ -209,6 +179,9 @@ function getEntriesFromDB(callback) {
              if (data.Items[i].mapAttr.M.playerLocale) {
                entry.locale = data.Items[i].mapAttr.M.playerLocale.S;
              }
+             if (data.Items[i].mapAttr.M.firstName) {
+               entry.firstName = data.Items[i].mapAttr.M.firstName.S;
+             }
              entry.adplayed = (data.Items[i].mapAttr.M.adStamp != undefined);
              if (data.Items[i].mapAttr.M.standard && data.Items[i].mapAttr.M.standard.M) {
                const standardGame = data.Items[i].mapAttr.M.standard.M;
@@ -271,7 +244,7 @@ function getEntriesFromDB(callback) {
 
 function checkScoreChange(newScores, callback) {
   // Read the S3 buckets that has everyone's scores
-  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'BlackjackScores.txt'}, (err, data) => {
+  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'BlackjackScores2.txt'}, (err, data) => {
     if (err) {
       console.log(err, err.stack);
       callback('error');
@@ -302,7 +275,8 @@ function checkScoreChange(newScores, callback) {
             let i = 0;
 
             for (i = 0; i < newLength; i++) {
-              if (scores[game][i] != newScores[game][i]) {
+              if ((scores[game][i].name != newScores[game][i].name)
+                && (scores[game][i].bankroll != newScores[game][i].bankroll)) {
                 callback('different');
                 return;
               }
