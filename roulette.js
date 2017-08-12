@@ -9,21 +9,21 @@ AWS.config.update({region: 'us-east-1'});
 const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
+const speechUtils = require('alexa-speech-utils')();
 
 module.exports = {
   // Generates the text for blackjack e-mail summary
   getRouletteMail: function(callback) {
-    const american = {high: 0, spins: 0, players: 0, recentPlayers: 0};
-    const european = {high: 0, spins: 0, players: 0, recentPlayers: 0};
+    const american = {players: 0, recentPlayers: 0};
+    const european = {players: 0, recentPlayers: 0};
     const tournament = {high: 0, spins: 0, players: 0};
     const surveyResults = {accepted: 0, declined: 0, tournamentYes: 0, tournamentNo: 0,
           leaderYes: 0, leaderNo: 0, otherYes: 0, otherNo: 0};
     const adsPlayed = {};
     let spins;
     let text;
-    let oldFormat = 0;
-    let newFormat = 0;
     const now = Date.now();
+    const registered = [];
 
     getLastCloseTime((tournamentClose) => {
       // Loop thru to read in all items from the DB
@@ -76,35 +76,23 @@ module.exports = {
 
                  if (data.Items[i].mapAttr.M.highScore
                       && data.Items[i].mapAttr.M.highScore.M) {
-                   // This is the old format
-                   oldFormat++;
-
                    // Only counts if they spinned
                    const score = data.Items[i].mapAttr.M.highScore.M;
                    if (score.spinsAmerican && score.spinsAmerican.N) {
                      spins = parseInt(score.spinsAmerican.N);
-                     american.spins += spins;
                      if (spins) {
                        american.players++;
-                     }
-                     if (parseInt(score.currentAmerican.N) > american.high) {
-                       american.high = parseInt(score.currentAmerican.N);
                      }
                    }
 
                    if (score.spinsEuropean && score.spinsEuropean.N) {
                      spins = parseInt(score.spinsEuropean.N);
-                     european.spins += spins;
                      if (spins) {
                        european.players++;
-                     }
-                     if (parseInt(score.currentEuropean.N) > european.high) {
-                       european.high = parseInt(score.currentEuropean.N);
                      }
                    }
                  } else {
                    let scoreData;
-                   newFormat++;
 
                    if (data.Items[i].mapAttr.M.american && data.Items[i].mapAttr.M.american.M) {
                      // This is the new format
@@ -112,12 +100,8 @@ module.exports = {
 
                      if (scoreData.spins && scoreData.spins.N) {
                        spins = parseInt(scoreData.spins.N);
-                       american.spins += spins;
                        if (spins) {
                          american.players++;
-                       }
-                       if (parseInt(scoreData.bankroll.N) > american.high) {
-                         american.high = parseInt(scoreData.bankroll.N);
                        }
                        if (scoreData.timestamp && scoreData.timestamp.N) {
                          if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
@@ -133,12 +117,8 @@ module.exports = {
 
                      if (scoreData.spins && scoreData.spins.N) {
                        spins = parseInt(scoreData.spins.N);
-                       european.spins += spins;
                        if (spins) {
                          european.players++;
-                       }
-                       if (parseInt(scoreData.bankroll.N) > european.high) {
-                         european.high = parseInt(scoreData.bankroll.N);
                        }
                        if (scoreData.timestamp && scoreData.timestamp.N) {
                          if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
@@ -167,6 +147,10 @@ module.exports = {
                        }
                      }
                    }
+
+                   if (data.Items[i].mapAttr.M.firstName) {
+                     registered.push(data.Items[i].mapAttr.M.firstName.S);
+                   }
                  }
                }
              }
@@ -177,16 +161,21 @@ module.exports = {
          });
        }
       })(true, null).then(() => {
+        let registeredText = '';
+        if (registered.length) {
+          registeredText = 'The following individuals have registered: ' + speechUtils.and(registered) + '\r\n';
+        }
+
         text = ('You have ' + american.players + ' players on an American wheel, ' + american.recentPlayers + ' of whom have played in the last 24 hours. ');
-        text += ('In total they have done ' + american.spins + ' spins with a high score of ' + american.high + ' units.\r\n\r\n');
         text += ('You have ' + european.players + ' players on a European wheel, ' + european.recentPlayers + ' of whom have played in the last 24 hours. ');
-        text += ('In total they have done ' + european.spins + ' spins with a high score of ' + european.high + ' units.\r\n\r\n');
-        text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
-        text += ('There are ' + newFormat + ' people on new-style attributes and ' + oldFormat + ' people with old-style attributes.\r\n\r\n');
+        if (tournament.players) {
+          text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
+        }
         text += (surveyResults.accepted + ' people have taken the survey and ' + surveyResults.declined + ' passed on the survey. ');
         text += (surveyResults.tournamentYes + ' out of ' + (surveyResults.tournamentYes + surveyResults.tournamentNo) + ' people answered yes to the tournament question. ');
         text += (surveyResults.leaderYes + ' out of ' + (surveyResults.leaderYes + surveyResults.leaderNo) + ' people answered yes to the leader board question. ');
         text += (surveyResults.otherYes + ' out of ' + (surveyResults.otherYes + surveyResults.otherNo) + ' people answered yes to the other games question.\r\n\r\n');
+        text += registeredText;
         text += utils.getAdText(adsPlayed);
         callback(text);
       }).catch((err) => {
@@ -212,7 +201,7 @@ module.exports = {
             // It's not the same, so try to write it out
             const params = {Body: JSON.stringify(scoreData),
               Bucket: 'garrett-alexa-usage',
-              Key: 'RouletteScores.txt'};
+              Key: 'RouletteScores2.txt'};
 
             s3.putObject(params, (err, data) => {
               if (err) {
@@ -225,15 +214,13 @@ module.exports = {
     });
   },
   closeTournament: function(callback) {
-    getRankFromDB((err, americanScores, europeanScores, tournamentScores, tournamentSpins) => {
+    getRankFromDB((err, americanScores, europeanScores, tournamentScores, spins) => {
       if (err) {
         callback(err);
       } else {
-        const highScore = (tournamentScores && tournamentScores[0]) ? tournamentScores[0] : 1;
+        const highScore = (tournamentScores && tournamentScores[0])
+            ? tournamentScores[0].bankroll : 1;
         const players = (tournamentScores ? tournamentScores.length : 0);
-        let spins = 0;
-
-        tournamentSpins.map((spin) => spins += spin);
 
         // Now get the list of completed tournaments to add to
         s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'RouletteTournamentResults.txt'}, (err, data) => {
@@ -264,7 +251,7 @@ function getRankFromDB(callback) {
   const americanScores = [];
   const europeanScores = [];
   const tournamentScores = [];
-  const tournamentSpins = [];
+  let tournamentSpins = 0;
   let scoreData;
 
   // First find the last tournament close time
@@ -283,6 +270,10 @@ function getRankFromDB(callback) {
 
           for (i = 0; i < data.Items.length; i++) {
             if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
+              const firstName = (data.Items[i].mapAttr.M.firstName)
+                ? data.Items[i].mapAttr.M.firstName.S
+                : undefined;
+
               if (data.Items[i].mapAttr.M.highScore
                     && data.Items[i].mapAttr.M.highScore.M) {
                 // This is the old-style format
@@ -298,10 +289,10 @@ function getRankFromDB(callback) {
                   ? parseInt(score.currentEuropean.N) : 0;
 
                  if (spinsAmerican) {
-                   americanScores.push(highAmerican);
+                   americanScores.push({name: firstName, bankroll: highAmerican});
                  }
                  if (spinsEuropean) {
-                   europeanScores.push(highEuropean);
+                   europeanScores.push({name: firstName, bankroll: highEuropean});
                  }
               }
 
@@ -315,7 +306,7 @@ function getRankFromDB(callback) {
                       ? parseInt(scoreData.bankroll.N) : 0;
 
                 if (spins) {
-                  americanScores.push(high);
+                  americanScores.push({name: firstName, bankroll: high});
                 }
               }
 
@@ -328,7 +319,7 @@ function getRankFromDB(callback) {
                       ? parseInt(scoreData.bankroll.N) : 0;
 
                 if (spins) {
-                  europeanScores.push(high);
+                  europeanScores.push({name: firstName, bankroll: high});
                 }
               }
 
@@ -345,8 +336,8 @@ function getRankFromDB(callback) {
                         ? parseInt(scoreData.bankroll.N) : 0;
 
                   if (spins) {
-                    tournamentScores.push(high);
-                    tournamentSpins.push(spins);
+                    tournamentScores.push({name: firstName, bankroll: high});
+                    tournamentSpins += spins;
                   }
                 }
               }
@@ -359,10 +350,9 @@ function getRankFromDB(callback) {
         });
       }
     })(true, null).then(() => {
-      americanScores.sort((a, b) => (b-a));
-      europeanScores.sort((a, b) => (b-a));
-      tournamentScores.sort((a, b) => (b-a));
-      tournamentSpins.sort((a, b) => (b-a));
+      americanScores.sort((a, b) => (b.bankroll - a.bankroll));
+      europeanScores.sort((a, b) => (b.bankroll - a.bankroll));
+      tournamentScores.sort((a, b) => (b.bankroll - a.bankroll));
       callback(null, americanScores, europeanScores, tournamentScores, tournamentSpins);
     }).catch((err) => {
       console.log('Error scanning: ' + err);
@@ -373,7 +363,7 @@ function getRankFromDB(callback) {
 
 function checkScoreChange(newScores, callback) {
   // Read the S3 buckets that has everyone's scores
-  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'RouletteScores.txt'}, (err, data) => {
+  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'RouletteScores2.txt'}, (err, data) => {
     if (err) {
       console.log(err, err.stack);
       callback('error');
@@ -393,14 +383,16 @@ function checkScoreChange(newScores, callback) {
         let i = 0;
 
         for (i = 0; i < scores.americanScores.length; i++) {
-          if (scores.americanScores[i] != newScores.americanScores[i]) {
+          if ((scores.americanScores[i].name != newScores.americanScores[i].name)
+              || (scores.americanScores[i].bankroll != newScores.americanScores[i].bankroll)) {
             callback('different');
             return;
           }
         }
 
         for (i = 0; i < scores.europeanScores.length; i++) {
-          if (scores.europeanScores[i] != newScores.europeanScores[i]) {
+          if ((scores.europeanScores[i].name != newScores.europeanScores[i].name)
+              || (scores.europeanScores[i].bankroll != newScores.europeanScores[i].bankroll)) {
             callback('different');
             return;
           }
@@ -408,7 +400,8 @@ function checkScoreChange(newScores, callback) {
 
         if (oldTournament) {
           for (i = 0; i < scores.tournamentScores.length; i++) {
-            if (scores.tournamentScores[i] != newScores.tournamentScores[i]) {
+          if ((scores.tournamentScores[i].name != newScores.tournamentScores[i].name)
+              || (scores.tournamentScores[i].bankroll != newScores.tournamentScores[i].bankroll)) {
               callback('different');
               return;
             }
