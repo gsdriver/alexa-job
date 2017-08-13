@@ -64,6 +64,22 @@ module.exports = {
       }
     });
   },
+  getFacebookIDs: function(callback) {
+    const users = [];
+    let i;
+
+    getEntriesFromDB((err, results, newads) => {
+      for (i = 0; i < results.length; i++) {
+        if (results[i].facebookID) {
+          users.push({id: results[i].facebookID,
+            name: results[i].firstName,
+            email: results[i].email});
+        }
+      }
+
+      callback(users);
+    });
+  },
   updateBlackjackScores: function() {
     getEntriesFromDB((err, results, newads) => {
       if (!err) {
@@ -185,6 +201,12 @@ function getEntriesFromDB(callback) {
              if (data.Items[i].mapAttr.M.firstName) {
                entry.firstName = data.Items[i].mapAttr.M.firstName.S;
              }
+             if (data.Items[i].mapAttr.M.facebookID) {
+               entry.facebookID = data.Items[i].mapAttr.M.facebookID.S;
+             }
+             if (data.Items[i].mapAttr.M.email) {
+               entry.email = data.Items[i].mapAttr.M.email.S;
+             }
              entry.adplayed = (data.Items[i].mapAttr.M.adStamp != undefined);
              if (data.Items[i].mapAttr.M.standard && data.Items[i].mapAttr.M.standard.M) {
                const standardGame = data.Items[i].mapAttr.M.standard.M;
@@ -240,7 +262,8 @@ function getEntriesFromDB(callback) {
     })(true, null).then(() => {
       callback(null, results, newads);
     }).catch((err) => {
-      callback(err, null), null;
+      console.log(err.stack);
+      callback(err, null, null);
     });
   });
 }

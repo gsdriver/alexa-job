@@ -184,6 +184,51 @@ module.exports = {
       });
     });
   },
+  getFacebookIDs: function(callback) {
+    const users = [];
+
+    // Loop thru to read in all items from the DB
+    (function loop(firstRun, startKey) {
+      const params = {TableName: 'RouletteWheel'};
+
+      if (firstRun || startKey) {
+        params.ExclusiveStartKey = startKey;
+
+        const scanPromise = dynamodb.scan(params).promise();
+        return scanPromise.then((data) => {
+          let i;
+          for (i = 0; i < data.Items.length; i++) {
+             if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
+               if (data.Items[i].mapAttr.M.facebookID
+                  && data.Items[i].mapAttr.M.facebookID.S) {
+                 const entry = {};
+
+                 entry.id = data.Items[i].mapAttr.M.facebookID.S;
+                 if (data.Items[i].mapAttr.M.firstName
+                    && data.Items[i].mapAttr.M.firstName.S) {
+                   entry.name = data.Items[i].mapAttr.M.firstName.S;
+                 }
+                 if (data.Items[i].mapAttr.M.email
+                    && data.Items[i].mapAttr.M.email.S) {
+                   entry.email = data.Items[i].mapAttr.M.email.S;
+                 }
+                 users.push(entry);
+               }
+             }
+           }
+
+           if (data.LastEvaluatedKey) {
+             return loop(false, data.LastEvaluatedKey);
+           }
+         });
+      }
+    })(true, null).then(() => {
+      callback(users);
+    }).catch((err) => {
+      console.log(err.stack);
+      callback([]);
+    });
+  },
   updateRouletteScores: function() {
     getRankFromDB((err, americanScores, europeanScores, tournamentScores) => {
       if (!err) {
