@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const contentDir = 'content/newusers';
-const csvFile = contentDir + '/summary.csv';
+const csvFile = 'newusers.csv';
 
 // Read every file from the content directory
 function readFiles(dirname, callback) {

@@ -5,3 +5,4 @@ build
 content
 .elasticbeanstalk
 log*.csv
+newusers.csv
