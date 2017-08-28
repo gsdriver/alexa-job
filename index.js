@@ -8,6 +8,7 @@ const roulette = require('./roulette');
 const blackjack = require('./blackjack');
 const slotmachine = require('./slotmachine');
 const videopoker = require('./videopoker');
+const craps = require('./craps');
 const utils = require('./utils');
 const AWS = require('aws-sdk');
 AWS.config.update({
@@ -50,11 +51,12 @@ function sendEmail(text, callback) {
 }
 
 function getMailText(callback) {
-  let toRun = 4;
+  let toRun = 5;
   let bjText;
   let slotText;
   let rouletteText;
   let pokerText;
+  let crapsText;
 
   blackjack.getBlackjackMail((text) => {
     bjText = text;
@@ -76,10 +78,15 @@ function getMailText(callback) {
     completed();
   });
 
+  craps.getCrapsMail((text) => {
+    crapsText = text;
+    completed();
+  });
+
   function completed() {
     toRun--;
     if (toRun === 0) {
-      const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText;
+      const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText + '\r\n\r\nCRAPS\r\n' + crapsText;
       callback(mailBody);
     }
   }
@@ -98,6 +105,7 @@ if (process.env.RUNLOOP) {
     slotmachine.updateSlotMachineScores();
     blackjack.updateBlackjackScores();
     videopoker.updatePokerScores();
+    craps.updateCrapsScores();
 
     // Send mail around 5 AM and 5 PM
     const d = new Date();

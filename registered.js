@@ -4,7 +4,6 @@
 
 'use strict';
 
-const FB = require('facebook-node');
 const roulette = require('./roulette');
 const blackjack = require('./blackjack');
 
