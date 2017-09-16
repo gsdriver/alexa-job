@@ -49,7 +49,7 @@ module.exports = {
   },
   saveNewUsers: function() {
     const now = Date.now();
-    const details = {roulette: 0, blackjack: 0, slots: 0, poker: 0, timestamp: now};
+    const details = {roulette: 0, blackjack: 0, slots: 0, poker: 0, craps: 0, timestamp: now};
 
     // Read from the databases
     dynamodb.getItem({TableName: 'RouletteWheel', Key: {userId: {S: 'game'}}},
@@ -68,27 +68,36 @@ module.exports = {
                         (err, data) => {
                   if (data && data.Item && data.Item.newUsers) {
                     details.poker = parseInt(data.Item.newUsers.N);
+                    dynamodb.getItem({TableName: 'Craps', Key: {userId: {S: 'game'}}},
+                            (err, data) => {
+                      if (data && data.Item && data.Item.newUsers) {
+                        details.craps = parseInt(data.Item.newUsers.N);
 
-                    // Now write to S3
-                    const params = {Body: JSON.stringify(details),
-                      Bucket: 'garrett-alexa-usage',
-                      Key: 'newusers/' + now + '.txt'};
+                        // Now write to S3
+                        const params = {Body: JSON.stringify(details),
+                          Bucket: 'garrett-alexa-usage',
+                          Key: 'newusers/' + now + '.txt'};
 
-                    s3.putObject(params, (err, data) => {});
+                        s3.putObject(params, (err, data) => {});
 
-                    // And reset the DBs
-                    dynamodb.putItem({TableName: 'RouletteWheel',
-                                  Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
-                                  (err, data) => {});
-                    dynamodb.putItem({TableName: 'PlayBlackjack',
-                                  Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
-                                  (err, data) => {});
-                    dynamodb.putItem({TableName: 'Slots',
-                                  Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
-                                  (err, data) => {});
-                    dynamodb.putItem({TableName: 'VideoPoker',
-                                  Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
-                                  (err, data) => {});
+                        // And reset the DBs
+                        dynamodb.putItem({TableName: 'RouletteWheel',
+                                      Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
+                                      (err, data) => {});
+                        dynamodb.putItem({TableName: 'PlayBlackjack',
+                                      Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
+                                      (err, data) => {});
+                        dynamodb.putItem({TableName: 'Slots',
+                                      Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
+                                      (err, data) => {});
+                        dynamodb.putItem({TableName: 'VideoPoker',
+                                      Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
+                                      (err, data) => {});
+                        dynamodb.putItem({TableName: 'Craps',
+                                      Item: {userId: {S: 'game'}, newUsers: {N: '0'}}},
+                                      (err, data) => {});
+                      }
+                    });
                   }
                 });
               }

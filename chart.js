@@ -53,17 +53,20 @@ readFiles(contentDir, (err, results) => {
     console.log(err);
   } else {
     // Now go through each result and write to a CSV file
-    let text = 'Date,Roulette,Blackjack,Slots,Poker\n';
+    let text = 'Date,Roulette,Blackjack,Slots,Poker,Craps\n';
 
     results.sort((a, b) => (a.timestamp - b.timestamp));
     results.forEach((result) => {
       const recordDate = new Date(result.timestamp);
       recordDate.setDate(recordDate.getDate() - 1);
+      text += getFormattedDate(recordDate) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots;
       if (result.poker !== undefined) {
-        text += getFormattedDate(recordDate) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + ',' + result.poker + '\n';
-      } else {
-        text += getFormattedDate(recordDate) + ',' + result.roulette + ',' + result.blackjack + ',' + result.slots + '\n';
+        text += ',' + result.poker;
       }
+      if (result.craps !== undefined) {
+        text += ',' + result.craps;
+      }
+      text += '\n';
     });
 
     fs.writeFile(csvFile, text, (err) => {
