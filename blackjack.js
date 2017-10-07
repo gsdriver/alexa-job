@@ -91,7 +91,8 @@ module.exports = {
         for (i = 0; i < results.length; i++) {
           if (results[i].standard && results[i].standard.bankroll) {
             scores.standard.push({name: results[i].firstName,
-                bankroll: results[i].standard.bankroll});
+                bankroll: results[i].standard.bankroll,
+                achievementScore: results[i].achievementScore});
           }
           if (results[i].tournament && results[i].tournament.bankroll) {
             scores.tournament.push({name: results[i].firstName,
@@ -109,7 +110,7 @@ module.exports = {
             // It's not the same, so try to write it out
             const params = {Body: JSON.stringify(scoreData),
               Bucket: 'garrett-alexa-usage',
-              Key: 'BlackjackScores2.txt'};
+              Key: 'BlackjackScores.txt'};
 
             s3.putObject(params, (err, data) => {
               if (err) {
@@ -192,6 +193,23 @@ function getEntriesFromDB(callback) {
            if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
              const entry = {};
 
+             // Calculate achievement score
+             entry.achievementScore = 0;
+             if (data.Items[i].mapAttr.M.achievements) {
+               const achievements = data.Items[i].mapAttr.M.achievements.M;
+               if (achievements.trophy && achievements.trophy.N) {
+                 entry.achievementScore += 100 * parseInt(achievements.trophy.N);
+               }
+               if (achievements.daysPlayed && achievements.daysPlayed.N) {
+                 entry.achievementScore += 10 * parseInt(achievements.daysPlayed.N);
+               }
+               if (achievements.naturals && achievements.naturals.N) {
+                 entry.achievementScore += 5 * parseInt(achievements.naturals.N);
+               }
+               if (achievements.streakScore && achievements.streakScore.N) {
+                 entry.achievementScore += parseInt(achievements.streakScore.N);
+               }
+             }
              if (data.Items[i].mapAttr.M.numRounds) {
                entry.numRounds = parseInt(data.Items[i].mapAttr.M.numRounds.N);
              }
@@ -270,7 +288,7 @@ function getEntriesFromDB(callback) {
 
 function checkScoreChange(newScores, callback) {
   // Read the S3 buckets that has everyone's scores
-  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'BlackjackScores2.txt'}, (err, data) => {
+  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'BlackjackScores.txt'}, (err, data) => {
     if (err) {
       console.log(err, err.stack);
       callback('error');
@@ -302,7 +320,8 @@ function checkScoreChange(newScores, callback) {
 
             for (i = 0; i < newLength; i++) {
               if ((scores[game][i].name != newScores[game][i].name)
-                || (scores[game][i].bankroll != newScores[game][i].bankroll)) {
+                || (scores[game][i].bankroll != newScores[game][i].bankroll)
+                || (scores[game][i].achievementScore != newScores[game][i].achievementScore)) {
                 callback('different');
                 return;
               }
