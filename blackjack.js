@@ -100,7 +100,7 @@ module.exports = {
           }
         }
 
-        scores.standard.sort((a, b) => (b.bankroll - a.bankroll));
+        scores.standard.sort((a, b) => (b.achievementScore - a.achievementScore));
         scores.tournament.sort((a, b) => (b.bankroll - a.bankroll));
         scoreData.scores = scores;
 
