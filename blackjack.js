@@ -6,10 +6,9 @@
 
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
-const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
+const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
-const speechUtils = require('alexa-speech-utils')();
 
 module.exports = {
   // Generates the text for blackjack e-mail summary
@@ -24,7 +23,6 @@ module.exports = {
         const players = {};
         let standardRecent = 0;
         const now = Date.now();
-        const registered = [];
 
         for (i = 0; i < results.length; i++) {
           if (players[results[i].locale]) {
@@ -40,24 +38,14 @@ module.exports = {
               standardRecent++;
             }
           }
-
-          if (results[i].firstName) {
-            registered.push(results[i].firstName);
-          }
-        }
-
-        let registeredText = '';
-        if (registered.length) {
-          registeredText = 'The following individuals have registered: ' + speechUtils.and(registered) + '\r\n';
         }
 
         // Get the progressive information for standard
         getProgressive('standard', (game, progressiveHands, jackpots) => {
-          text = 'Of ' + results.length + ' registered players ';
+          text = 'Of ' + results.length + ' active players ';
           text += standardRecent + ' have played in the past 24 hours. ';
           text += 'There are ' + players['en-US'] + ' American players and ' + players['en-GB'] + ' UK players. ';
           text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
-          text += registeredText;
           text += utils.getAdText(newads);
           callback(text);
         });
@@ -78,6 +66,22 @@ module.exports = {
       }
 
       callback(users);
+    });
+  },
+  getAchievementScores: function(callback) {
+    getEntriesFromDB((err, results, newads) => {
+      if (err) {
+        callback(err, null);
+      } else {
+        const daysPlayed = {};
+
+        results.forEach((result) => {
+          if (result.daysPlayed) {
+            daysPlayed[result.daysPlayed] = (daysPlayed[result.daysPlayed] + 1) || 1;
+          }
+        });
+        callback(null, daysPlayed);
+      }
     });
   },
   updateBlackjackScores: function() {
@@ -184,86 +188,77 @@ function getEntriesFromDB(callback) {
      if (firstRun || startKey) {
        params.ExclusiveStartKey = startKey;
 
-       const scanPromise = dynamodb.scan(params).promise();
+       const scanPromise = doc.scan(params).promise();
        return scanPromise.then((data) => {
          let i;
 
          utils.getAdSummary(data, newads);
          for (i = 0; i < data.Items.length; i++) {
-           if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
+           if (data.Items[i].mapAttr) {
              const entry = {};
 
              // Calculate achievement score
              entry.achievementScore = 0;
-             if (data.Items[i].mapAttr.M.achievements) {
-               const achievements = data.Items[i].mapAttr.M.achievements.M;
-               if (achievements.trophy && achievements.trophy.N) {
-                 entry.achievementScore += 100 * parseInt(achievements.trophy.N);
+             if (data.Items[i].mapAttr.achievements) {
+               const achievements = data.Items[i].mapAttr.achievements;
+               if (achievements.trophy) {
+                 entry.achievementScore += 100 * parseInt(achievements.trophy);
                }
-               if (achievements.daysPlayed && achievements.daysPlayed.N) {
-                 entry.achievementScore += 10 * parseInt(achievements.daysPlayed.N);
+               if (achievements.daysPlayed) {
+                 entry.achievementScore += 10 * parseInt(achievements.daysPlayed);
+                 entry.daysPlayed = parseInt(achievements.daysPlayed);
                }
-               if (achievements.naturals && achievements.naturals.N) {
-                 entry.achievementScore += 5 * parseInt(achievements.naturals.N);
+               if (achievements.naturals) {
+                 entry.achievementScore += 5 * parseInt(achievements.naturals);
                }
-               if (achievements.streakScore && achievements.streakScore.N) {
-                 entry.achievementScore += parseInt(achievements.streakScore.N);
+               if (achievements.streakScore) {
+                 entry.achievementScore += parseInt(achievements.streakScore);
                }
              }
-             if (data.Items[i].mapAttr.M.numRounds) {
-               entry.numRounds = parseInt(data.Items[i].mapAttr.M.numRounds.N);
+             if (data.Items[i].mapAttr.numRounds) {
+               entry.numRounds = parseInt(data.Items[i].mapAttr.numRounds);
              }
-             if (data.Items[i].mapAttr.M.playerLocale) {
-               entry.locale = data.Items[i].mapAttr.M.playerLocale.S;
+             if (data.Items[i].mapAttr.playerLocale) {
+               entry.locale = data.Items[i].mapAttr.playerLocale;
              }
-             if (data.Items[i].mapAttr.M.firstName) {
-               entry.firstName = data.Items[i].mapAttr.M.firstName.S;
-             }
-             if (data.Items[i].mapAttr.M.facebookID) {
-               entry.facebookID = data.Items[i].mapAttr.M.facebookID.S;
-             }
-             if (data.Items[i].mapAttr.M.email) {
-               entry.email = data.Items[i].mapAttr.M.email.S;
-             }
-             entry.adplayed = (data.Items[i].mapAttr.M.adStamp != undefined);
-             if (data.Items[i].mapAttr.M.standard && data.Items[i].mapAttr.M.standard.M) {
-               const standardGame = data.Items[i].mapAttr.M.standard.M;
+             if (data.Items[i].mapAttr.standard) {
+               const standardGame = data.Items[i].mapAttr.standard;
 
                entry.standard = {};
                entry.nonService = true;
-               if (standardGame.hands && standardGame.hands.N) {
-                 entry.standard.hands = parseInt(standardGame.hands.N);
+               if (standardGame.hands) {
+                 entry.standard.hands = parseInt(standardGame.hands);
                }
-               if (standardGame.timestamp && standardGame.timestamp.N) {
-                 entry.standard.timestamp = parseInt(standardGame.timestamp.N);
+               if (standardGame.timestamp) {
+                 entry.standard.timestamp = parseInt(standardGame.timestamp);
                }
                // Only count bankroll if it looks like they played
-               if (standardGame.bankroll && standardGame.bankroll.N) {
-                 const bankroll = parseInt(standardGame.bankroll.N);
+               if (standardGame.bankroll) {
+                 const bankroll = parseInt(standardGame.bankroll);
 
                  if (entry.standard.hands || (bankroll !== 5000)) {
-                   entry.standard.bankroll = parseInt(standardGame.bankroll.N);
+                   entry.standard.bankroll = parseInt(standardGame.bankroll);
                  }
                }
              }
 
-            if (data.Items[i].mapAttr.M.tournament && data.Items[i].mapAttr.M.tournament.M) {
-              const tournament = data.Items[i].mapAttr.M.tournament.M;
+            if (data.Items[i].mapAttr.tournament) {
+              const tournament = data.Items[i].mapAttr.tournament;
 
               // Only count tournament scores that are still active
-              if (tournament.timestamp && tournament.timestamp.N &&
-                  (parseInt(tournament.timestamp.N) > tournamentClose)) {
+              if (tournament.timestamp &&
+                  (parseInt(tournament.timestamp) > tournamentClose)) {
                 entry.tournament = {};
-                if (tournament.hands && tournament.hands.N) {
-                  entry.tournament.hands = parseInt(tournament.hands.N);
+                if (tournament.hands) {
+                  entry.tournament.hands = parseInt(tournament.hands);
                 }
-                entry.tournament.timestamp = parseInt(tournament.timestamp.N);
+                entry.tournament.timestamp = parseInt(tournament.timestamp);
                 // Only count bankroll if it looks like they played
-                if (tournament.bankroll && tournament.bankroll.N) {
-                  const bankroll = parseInt(tournament.bankroll.N);
+                if (tournament.bankroll) {
+                  const bankroll = parseInt(tournament.bankroll);
 
                   if (entry.hands || (bankroll !== 5000)) {
-                    entry.tournament.bankroll = parseInt(tournament.bankroll.N);
+                    entry.tournament.bankroll = parseInt(tournament.bankroll);
                   }
                 }
               }
@@ -337,8 +332,8 @@ function checkScoreChange(newScores, callback) {
 }
 
 function getProgressive(game, callback) {
-  // Read from Dynamodb
-  dynamodb.getItem({TableName: 'PlayBlackjack', Key: {userId: {S: 'game-' + game}}},
+  // Read from database
+  doc.get({TableName: 'PlayBlackjack', Key: {userId: 'game-' + game}},
           (err, data) => {
     if (err || (data.Item === undefined)) {
       callback(game, undefined);
@@ -347,11 +342,11 @@ function getProgressive(game, callback) {
       let hands;
       let jackpots;
 
-      if (data.Item.hands && data.Item.hands.N) {
-        hands = parseInt(data.Item.hands.N);
+      if (data.Item.hands) {
+        hands = parseInt(data.Item.hands);
       }
-      if (data.Item.jackpots && data.Item.jackpots.N) {
-        jackpots = parseInt(data.Item.jackpots.N);
+      if (data.Item.jackpots) {
+        jackpots = parseInt(data.Item.jackpots);
       }
 
       callback(game, hands, jackpots);

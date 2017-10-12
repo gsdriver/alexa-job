@@ -9,7 +9,6 @@ AWS.config.update({region: 'us-east-1'});
 const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
-const speechUtils = require('alexa-speech-utils')();
 
 module.exports = {
   // Generates the text for blackjack e-mail summary
@@ -161,21 +160,11 @@ module.exports = {
          });
        }
       })(true, null).then(() => {
-        let registeredText = '';
-        if (registered.length) {
-          registeredText = 'The following individuals have registered: ' + speechUtils.and(registered) + '\r\n';
-        }
-
         text = ('You have ' + american.players + ' players on an American wheel, ' + american.recentPlayers + ' of whom have played in the last 24 hours. ');
         text += ('You have ' + european.players + ' players on a European wheel, ' + european.recentPlayers + ' of whom have played in the last 24 hours. ');
         if (tournament.players) {
           text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
         }
-        text += (surveyResults.accepted + ' people have taken the survey and ' + surveyResults.declined + ' passed on the survey. ');
-        text += (surveyResults.tournamentYes + ' out of ' + (surveyResults.tournamentYes + surveyResults.tournamentNo) + ' people answered yes to the tournament question. ');
-        text += (surveyResults.leaderYes + ' out of ' + (surveyResults.leaderYes + surveyResults.leaderNo) + ' people answered yes to the leader board question. ');
-        text += (surveyResults.otherYes + ' out of ' + (surveyResults.otherYes + surveyResults.otherNo) + ' people answered yes to the other games question.\r\n\r\n');
-        text += registeredText;
         text += utils.getAdText(adsPlayed);
         callback(text);
       }).catch((err) => {
