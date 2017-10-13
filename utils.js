@@ -31,6 +31,26 @@ module.exports = {
       }
     }
   },
+  getAdSummaryDoc: function(data, adsPlayed) {
+    let i;
+
+    for (i = 0; i < data.Items.length; i++) {
+      // Any ads played?
+      if (data.Items[i].mapAttr
+              && data.Items[i].mapAttr.adsPlayed) {
+        const ads = data.Items[i].mapAttr.adsPlayed;
+        let ad;
+
+        for (ad in ads) {
+          if (adsPlayed[ad]) {
+            adsPlayed[ad]++;
+          } else {
+            adsPlayed[ad] = 1;
+          }
+        }
+      }
+    }
+  },
   getAdText: function(adsPlayed) {
     let text = '';
 

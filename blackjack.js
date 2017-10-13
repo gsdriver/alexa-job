@@ -192,7 +192,7 @@ function getEntriesFromDB(callback) {
        return scanPromise.then((data) => {
          let i;
 
-         utils.getAdSummary(data, newads);
+         utils.getAdSummaryDoc(data, newads);
          for (i = 0; i < data.Items.length; i++) {
            if (data.Items[i].mapAttr) {
              const entry = {};
