@@ -219,9 +219,10 @@ module.exports = {
     });
   },
   updateRouletteScores: function() {
-    getRankFromDB((err, americanScores, europeanScores, tournamentScores) => {
+    getRankFromDB((err, americanScores, europeanScores, tournamentScores, achievementScores) => {
       if (!err) {
         const scoreData = {timestamp: Date.now(),
+          achievementScores: achievementScores,
           americanScores: americanScores,
           europeanScores: europeanScores};
 
@@ -248,7 +249,7 @@ module.exports = {
     });
   },
   closeTournament: function(callback) {
-    getRankFromDB((err, americanScores, europeanScores, tournamentScores, spins) => {
+    getRankFromDB((err, americanScores, europeanScores, tournamentScores, achievementScores, spins) => {
       if (err) {
         callback(err);
       } else {
@@ -285,6 +286,7 @@ function getRankFromDB(callback) {
   const americanScores = [];
   const europeanScores = [];
   const tournamentScores = [];
+  const achievementScores = [];
   let tournamentSpins = 0;
   let scoreData;
 
@@ -307,6 +309,23 @@ function getRankFromDB(callback) {
               const firstName = (data.Items[i].mapAttr.M.firstName)
                 ? data.Items[i].mapAttr.M.firstName.S
                 : undefined;
+
+              // Calculate achievement score
+              let achievementScore = 0;
+              if (data.Items[i].mapAttr.M.achievements
+                && data.Items[i].mapAttr.M.achievements.M) {
+                const achievements = data.Items[i].mapAttr.M.achievements.M;
+                if (achievements.trophy && achievements.trophy.N) {
+                 achievementScore += 100 * parseInt(achievements.trophy.N);
+                }
+                if (achievements.daysPlayed && achievements.daysPlayed.N) {
+                 achievementScore += 10 * parseInt(achievements.daysPlayed.N);
+                }
+                if (achievements.streakScore && achievements.streakScore.N) {
+                 achievementScore += parseInt(achievements.streakScore.N);
+                }
+              }
+              achievementScores.push(achievementScore);
 
               if (data.Items[i].mapAttr.M.highScore
                     && data.Items[i].mapAttr.M.highScore.M) {
@@ -387,7 +406,8 @@ function getRankFromDB(callback) {
       americanScores.sort((a, b) => (b.bankroll - a.bankroll));
       europeanScores.sort((a, b) => (b.bankroll - a.bankroll));
       tournamentScores.sort((a, b) => (b.bankroll - a.bankroll));
-      callback(null, americanScores, europeanScores, tournamentScores, tournamentSpins);
+      achievementScores.sort((a, b) => (b - a));
+      callback(null, americanScores, europeanScores, tournamentScores, achievementScores, tournamentSpins);
     }).catch((err) => {
       console.log('Error scanning: ' + err);
       callback(err, null, null, null);
@@ -409,6 +429,7 @@ function checkScoreChange(newScores, callback) {
 
       if ((newScores.americanScores.length != scores.americanScores.length) ||
         (newScores.europeanScores.length != scores.europeanScores.length) ||
+        (newScores.achievementScores.length != scores.achievementScores.length) ||
         (newTournament != oldTournament)) {
         // They are different
         callback('different');
@@ -427,6 +448,13 @@ function checkScoreChange(newScores, callback) {
         for (i = 0; i < scores.europeanScores.length; i++) {
           if ((scores.europeanScores[i].name != newScores.europeanScores[i].name)
               || (scores.europeanScores[i].bankroll != newScores.europeanScores[i].bankroll)) {
+            callback('different');
+            return;
+          }
+        }
+
+        for (i = 0; i < scores.achievementScores.length; i++) {
+          if (scores.achievementScores[i] != newScores.achievementScores[i]) {
             callback('different');
             return;
           }
