@@ -3,36 +3,41 @@
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 
-if (process.argv.length !== 3) {
-  console.log('You need to specify which skill you want to process conversion data for.');
-  return;
-}
+module.exports = {
+  // Generates the text for blackjack e-mail summary
+  getBounceResults: function(skill, callback) {
+    let text;
 
-getLastStates((err, results) => {
-  let total = 0;
-  let result;
-  for (result in results) {
-    if (result) {
-      total = total + results[result];
-    }
-  }
-  if (total) {
-    console.log('Session bounce data for ' + process.argv[2] + ': ');
-    for (result in results) {
-      if (result) {
-        console.log(result + ': ' + Math.round((1000 * results[result]) / total) / 10 + '% (' + results[result] + ')');
+    getLastStates(skill, (err, results) => {
+      let total = 0;
+      let result;
+      for (result in results) {
+        if (result) {
+          total = total + results[result];
+        }
       }
-    }
-  } else {
-    console.log('No sessions recorded for ' + process.argv[2]);
-  }
-});
+      if (total) {
+        text = 'Session bounce data for ' + skill + ':\n';
+        for (result in results) {
+          if (result) {
+            text += ('  ' + result + ': ' +
+                Math.round((1000 * results[result]) / total) / 10 +
+                '% (' + results[result] + ')\n');
+          }
+        }
+      } else {
+        text = 'No sessions recorded for ' + skill;
+      }
+      callback(text);
+    });
+  },
+};
 
-function getLastStates(callback) {
+function getLastStates(skill, callback) {
   const states = {};
 
   AWS.config.update({region: 'us-east-1'});
-  readS3Files('garrett-alexa-logs', 'sessions/' + process.argv[2] + '/', null, (err, results) => {
+  readS3Files('garrett-alexa-logs', 'sessions/' + skill + '/', null, (err, results) => {
     if (err) {
       callback(err);
     } else {
@@ -141,3 +146,13 @@ function getKeyList(bucket, prefix, callback) {
     callback(err);
   });
 }
+
+/*
+if (process.argv.length === 3) {
+  module.exports.getBounceResults(process.argv[2], (text) => {
+    console.log(text);
+  });
+} else {
+  console.log('You need to specify a skill name');
+}
+*/

@@ -9,6 +9,7 @@ AWS.config.update({region: 'us-east-1'});
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
+const bounce = require('./bounce');
 
 module.exports = {
   // Generates the text for blackjack e-mail summary
@@ -42,12 +43,14 @@ module.exports = {
 
         // Get the progressive information for standard
         getProgressive('standard', (game, progressiveHands, jackpots) => {
-          text = 'Of ' + results.length + ' active players ';
-          text += standardRecent + ' have played in the past 24 hours. ';
-          text += 'There are ' + players['en-US'] + ' American players and ' + players['en-GB'] + ' UK players. ';
-          text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
-          text += utils.getAdText(newads);
-          callback(text);
+          bounce.getBounceResults('blackjack', (bounceText) => {
+            text = 'Of ' + results.length + ' active players ';
+            text += standardRecent + ' have played in the past 24 hours. ';
+            text += 'There are ' + players['en-US'] + ' American players and ' + players['en-GB'] + ' UK players. ';
+            text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
+            text += '\n' + bounceText;
+            callback(text);
+          });
         });
       }
     });

@@ -9,6 +9,7 @@ AWS.config.update({region: 'us-east-1'});
 const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
+const bounce = require('./bounce');
 
 module.exports = {
   // Generates the text for blackjack e-mail summary
@@ -160,13 +161,15 @@ module.exports = {
          });
        }
       })(true, null).then(() => {
-        text = ('You have ' + american.players + ' players on an American wheel, ' + american.recentPlayers + ' of whom have played in the last 24 hours. ');
-        text += ('You have ' + european.players + ' players on a European wheel, ' + european.recentPlayers + ' of whom have played in the last 24 hours. ');
-        if (tournament.players) {
-          text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
-        }
-        text += utils.getAdText(adsPlayed);
-        callback(text);
+        bounce.getBounceResults('roulette', (bounceText) => {
+          text = ('You have ' + american.players + ' players on an American wheel, ' + american.recentPlayers + ' of whom have played in the last 24 hours. ');
+          text += ('You have ' + european.players + ' players on a European wheel, ' + european.recentPlayers + ' of whom have played in the last 24 hours. ');
+          if (tournament.players) {
+            text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
+          }
+          text += '\n\n' + bounceText;
+          callback(text);
+        });
       }).catch((err) => {
         text = 'Error getting Roulette results: ' + err;
         callback(text);

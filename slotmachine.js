@@ -9,6 +9,7 @@ AWS.config.update({region: 'us-east-1'});
 const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
+const bounce = require('./bounce');
 
 module.exports = {
   // Generates the text for blackjack e-mail summary
@@ -64,23 +65,25 @@ module.exports = {
         for (game in games) {
           if (game) {
             getProgressive(game, (game, coins) => {
-              text += 'For ' + game + ' there are ' + games[game].players + ' total players ';
-              text += 'of whom ' + games[game].recentGames + ' have played in the past 24 hours.  ';
-              text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
-              text += ('The high score is ' + games[game].highScore + ' coins. ');
+              bounce.getBounceResults('slots', (bounceText) => {
+                text += 'For ' + game + ' there are ' + games[game].players + ' total players ';
+                text += 'of whom ' + games[game].recentGames + ' have played in the past 24 hours.  ';
+                text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
+                text += ('The high score is ' + games[game].highScore + ' coins. ');
 
-              if (coins && (coins > 0)) {
-                text += ('There are ' + coins + ' coins towards the next progressive jackpot. ');
-              }
+                if (coins && (coins > 0)) {
+                  text += ('There are ' + coins + ' coins towards the next progressive jackpot. ');
+                }
 
-              text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
+                text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
 
-              // Are we done?
-              readGames++;
-              if (readGames === numGames) {
-                text += utils.getAdText(newads);
-                callback(text);
-              }
+                // Are we done?
+                readGames++;
+                if (readGames === numGames) {
+                  text += bounceText;
+                  callback(text);
+                }
+              });
             });
           }
         }
