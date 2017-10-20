@@ -9,7 +9,23 @@ if (process.argv.length !== 3) {
 }
 
 getLastStates((err, results) => {
-  console.log(results);
+  let total = 0;
+  let result;
+  for (result in results) {
+    if (result) {
+      total = total + results[result];
+    }
+  }
+  if (total) {
+    console.log('Session bounce data for ' + process.argv[2] + ': ');
+    for (result in results) {
+      if (result) {
+        console.log(result + ': ' + Math.round((1000 * results[result]) / total) / 10 + '% (' + results[result] + ')');
+      }
+    }
+  } else {
+    console.log('No sessions recorded for ' + process.argv[2]);
+  }
 });
 
 function getLastStates(callback) {
@@ -41,6 +57,8 @@ function readS3Files(bucket, prefix, daterange, callback) {
   getKeyList(bucket, prefix, (err, keyList) => {
     if (err) {
       callback(err);
+    } else if (keyList.length === 0) {
+      callback('no results');
     } else {
       keysToProcess = keyList.length;
       (function processFiles(keyList) {
