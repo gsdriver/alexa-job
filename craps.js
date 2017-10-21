@@ -9,7 +9,6 @@ AWS.config.update({region: 'us-east-1'});
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
-const bounce = require('./bounce');
 
 module.exports = {
   // Generates the text for craps e-mail summary
@@ -48,14 +47,12 @@ module.exports = {
           registeredText = 'The following individuals have registered: ' + speechUtils.and(registered) + '\r\n';
         }
 
-        bounce.getBounceResults('craps', (bounceText) => {
-          text = 'Of ' + results.length + ' registered players ';
-          text += basicRecent + ' have played in the past 24 hours. ';
-          text += 'There have been a total of ' + numRounds + ' rounds played. ';
-          text += registeredText;
-          text += '\n\n' + bounceText;
-          callback(text);
-        });
+        text = 'Of ' + results.length + ' registered players ';
+        text += basicRecent + ' have played in the past 24 hours. ';
+        text += 'There have been a total of ' + numRounds + ' rounds played. ';
+        text += registeredText;
+        text += utils.getAdText(newads);
+        callback(text);
       }
     });
   },
