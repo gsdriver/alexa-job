@@ -131,25 +131,41 @@ module.exports = {
   getBounceResults: function(skill, callback) {
     let text;
 
-    getLastStates(skill, (err, results) => {
-      let total = 0;
+    getLastStates(skill, (err, results, states) => {
       let result;
-      for (result in results) {
-        if (result) {
-          total = total + results[result];
+
+      if (states) {
+        // First line, all the states
+        let i;
+        text = 'Date,';
+        for (i = 0; i < states.length; i++) {
+          text += states[i] + ',';
         }
-      }
-      if (total) {
-        text = 'Session bounce data for ' + skill + ':\n';
+        text += '\n';
         for (result in results) {
           if (result) {
-            text += ('  ' + result + ': ' +
-                Math.round((1000 * results[result]) / total) / 10 +
-                '% (' + results[result] + ')\n');
+            let state;
+            let total = 0;
+
+            // OK, let's write the results for this date
+            text += getFormattedDate(new Date(parseInt(result))) + ',';
+            for (state in results[result]) {
+              if (state) {
+                total += results[result][state];
+              }
+            }
+
+            if (total) {
+              states.forEach((state) => {
+                if (results[result][state]) {
+                  text += Math.round((1000 * results[result][state]) / total) / 10;
+                }
+                text += ',';
+              });
+            }
+            text += '\n';
           }
         }
-      } else {
-        text = 'No sessions recorded for ' + skill + '\n';
       }
       callback(text);
     });
@@ -157,21 +173,32 @@ module.exports = {
 };
 
 function getLastStates(skill, callback) {
-  const states = {};
+  const states = [];
+  const results = {};
 
   AWS.config.update({region: 'us-east-1'});
-  readS3Files('garrett-alexa-logs', 'sessions/' + skill + '/', null, (err, results) => {
+  readS3Files('garrett-alexa-logs', 'sessions/' + skill + '/', null, (err, data) => {
     if (err) {
       callback(err);
     } else {
-      results.forEach((result) => {
+      data.forEach((result) => {
         // Read state
         if (result.state) {
-          states[result.state] = (states[result.state] + 1) || 1;
+          // Strip the date from the timestamp
+          const fulldate = new Date(result.timestamp);
+          const date = (new Date(fulldate.getFullYear(), fulldate.getMonth(), fulldate.getDate())).valueOf();
+          if (!results[date]) {
+            results[date] = {};
+          }
+          results[date][result.state] = (results[date][result.state] + 1) || 1;
+
+          if (states.indexOf(result.state) === -1) {
+            states.push(result.state);
+          }
         }
       });
 
-      callback(null, states);
+      callback(null, results, states);
     }
   });
 }
@@ -268,4 +295,12 @@ function getKeyList(bucket, prefix, callback) {
   }).catch((err) => {
     callback(err);
   });
+}
+
+function getFormattedDate(date) {
+  const year = date.getFullYear();
+  const month = (1 + date.getMonth()).toString();
+  const day = date.getDate().toString();
+
+  return month + '/' + day + '/' + year;
 }
