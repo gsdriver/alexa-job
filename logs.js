@@ -22,7 +22,8 @@ const options = {
 const resultFile = 'log-' + process.argv[2] + '.csv';
 
 const now = new Date();
-options.daterange.start = (new Date(now.getFullYear(), now.getMonth(), now.getDate())).valueOf();
+options.daterange.start = (new Date(now.getFullYear(),
+        now.getMonth(), now.getDate() - 1)).valueOf();
 
 logger.processLogs(options, resultFile, (err) => {
   if (err) {

@@ -186,7 +186,8 @@ function getLastStates(skill, callback) {
         if (result.state) {
           // Strip the date from the timestamp
           const fulldate = new Date(result.timestamp);
-          const date = (new Date(fulldate.getFullYear(), fulldate.getMonth(), fulldate.getDate())).valueOf();
+          const date = (new Date(fulldate.getFullYear(),
+                fulldate.getMonth(), fulldate.getDate())).valueOf();
           if (!results[date]) {
             results[date] = {};
           }

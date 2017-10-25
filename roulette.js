@@ -6,7 +6,7 @@
 
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
-const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
+const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
 
@@ -16,13 +16,10 @@ module.exports = {
     const american = {players: 0, recentPlayers: 0};
     const european = {players: 0, recentPlayers: 0};
     const tournament = {high: 0, spins: 0, players: 0};
-    const surveyResults = {accepted: 0, declined: 0, tournamentYes: 0, tournamentNo: 0,
-          leaderYes: 0, leaderNo: 0, otherYes: 0, otherNo: 0};
     const adsPlayed = {};
     let spins;
     let text;
     const now = Date.now();
-    const registered = [];
 
     getLastCloseTime((tournamentClose) => {
       // Loop thru to read in all items from the DB
@@ -32,60 +29,26 @@ module.exports = {
         if (firstRun || startKey) {
           params.ExclusiveStartKey = startKey;
 
-          const scanPromise = dynamodb.scan(params).promise();
+          const scanPromise = doc.scan(params).promise();
           return scanPromise.then((data) => {
             // OK, let's see where you rank among American and European players
             let i;
 
-            utils.getAdSummary(data, adsPlayed);
+            utils.getAdSummaryDoc(data, adsPlayed);
             for (i = 0; i < data.Items.length; i++) {
-               if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
-                 // Were they offered the survey?
-                 if (data.Items[i].mapAttr.M.survey) {
-                   const survey = data.Items[i].mapAttr.M.survey.M;
-
-                   if (survey.accepted) {
-                     surveyResults.accepted++;
-                   }
-                   if (survey.declined) {
-                     surveyResults.declined++;
-                   }
-                   if (survey.SURVEY_QUESTION_TOURNAMENT) {
-                     if (survey.SURVEY_QUESTION_TOURNAMENT.BOOL) {
-                       surveyResults.tournamentYes++;
-                     } else {
-                       surveyResults.tournamentNo++;
-                     }
-                   }
-                   if (survey.SURVEY_QUESTION_LEADERBOARD) {
-                     if (survey.SURVEY_QUESTION_LEADERBOARD.BOOL) {
-                       surveyResults.leaderYes++;
-                     } else {
-                       surveyResults.leaderNo++;
-                     }
-                   }
-                   if (survey.SURVEY_QUESTION_OTHERGAMES) {
-                     if (survey.SURVEY_QUESTION_OTHERGAMES.BOOL) {
-                       surveyResults.otherYes++;
-                     } else {
-                       surveyResults.otherNo++;
-                     }
-                   }
-                 }
-
-                 if (data.Items[i].mapAttr.M.highScore
-                      && data.Items[i].mapAttr.M.highScore.M) {
+               if (data.Items[i].mapAttr) {
+                 if (data.Items[i].mapAttr.highScore) {
                    // Only counts if they spinned
-                   const score = data.Items[i].mapAttr.M.highScore.M;
-                   if (score.spinsAmerican && score.spinsAmerican.N) {
-                     spins = parseInt(score.spinsAmerican.N);
+                   const score = data.Items[i].mapAttr.highScore;
+                   if (score.spinsAmerican) {
+                     spins = parseInt(score.spinsAmerican);
                      if (spins) {
                        american.players++;
                      }
                    }
 
-                   if (score.spinsEuropean && score.spinsEuropean.N) {
-                     spins = parseInt(score.spinsEuropean.N);
+                   if (score.spinsEuropean) {
+                     spins = parseInt(score.spinsEuropean);
                      if (spins) {
                        european.players++;
                      }
@@ -93,62 +56,58 @@ module.exports = {
                  } else {
                    let scoreData;
 
-                   if (data.Items[i].mapAttr.M.american && data.Items[i].mapAttr.M.american.M) {
+                   if (data.Items[i].mapAttr.american) {
                      // This is the new format
-                     scoreData = data.Items[i].mapAttr.M.american.M;
+                     scoreData = data.Items[i].mapAttr.american;
 
-                     if (scoreData.spins && scoreData.spins.N) {
-                       spins = parseInt(scoreData.spins.N);
+                     if (scoreData.spins) {
+                       spins = parseInt(scoreData.spins);
                        if (spins) {
                          american.players++;
                        }
-                       if (scoreData.timestamp && scoreData.timestamp.N) {
-                         if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
+                       if (scoreData.timestamp) {
+                         if ((now - parseInt(scoreData.timestamp)) < 24*60*60*1000) {
                            american.recentPlayers++;
                          }
                        }
                      }
                    }
 
-                   if (data.Items[i].mapAttr.M.european && data.Items[i].mapAttr.M.european.M) {
+                   if (data.Items[i].mapAttr.european) {
                      // This is the new format
-                     scoreData = data.Items[i].mapAttr.M.european.M;
+                     scoreData = data.Items[i].mapAttr.european;
 
-                     if (scoreData.spins && scoreData.spins.N) {
-                       spins = parseInt(scoreData.spins.N);
+                     if (scoreData.spins) {
+                       spins = parseInt(scoreData.spins);
                        if (spins) {
                          european.players++;
                        }
-                       if (scoreData.timestamp && scoreData.timestamp.N) {
-                         if ((now - parseInt(scoreData.timestamp.N)) < 24*60*60*1000) {
+                       if (scoreData.timestamp) {
+                         if ((now - parseInt(scoreData.timestamp)) < 24*60*60*1000) {
                            european.recentPlayers++;
                          }
                        }
                      }
                    }
 
-                   if (data.Items[i].mapAttr.M.tournament && data.Items[i].mapAttr.M.tournament.M) {
+                   if (data.Items[i].mapAttr.tournament) {
                      // This is the new format
-                     scoreData = data.Items[i].mapAttr.M.tournament.M;
+                     scoreData = data.Items[i].mapAttr.tournament;
 
                      // Skip this if the tournament closed since they played
-                     if (scoreData.timestamp && scoreData.timestamp.N &&
-                          (parseInt(scoreData.timestamp.N) > tournamentClose)) {
-                       if (scoreData.spins && scoreData.spins.N) {
-                         spins = parseInt(scoreData.spins.N);
+                     if (scoreData.timestamp &&
+                          (parseInt(scoreData.timestamp) > tournamentClose)) {
+                       if (scoreData.spins) {
+                         spins = parseInt(scoreData.spins);
                          tournament.spins += spins;
                          if (spins) {
                            tournament.players++;
                          }
-                         if (parseInt(scoreData.bankroll.N) > tournament.high) {
-                           tournament.high = parseInt(scoreData.bankroll.N);
+                         if (parseInt(scoreData.bankroll) > tournament.high) {
+                           tournament.high = parseInt(scoreData.bankroll);
                          }
                        }
                      }
-                   }
-
-                   if (data.Items[i].mapAttr.M.firstName) {
-                     registered.push(data.Items[i].mapAttr.M.firstName.S);
                    }
                  }
                }
@@ -173,53 +132,9 @@ module.exports = {
       });
     });
   },
-  getFacebookIDs: function(callback) {
-    const users = [];
-
-    // Loop thru to read in all items from the DB
-    (function loop(firstRun, startKey) {
-      const params = {TableName: 'RouletteWheel'};
-
-      if (firstRun || startKey) {
-        params.ExclusiveStartKey = startKey;
-
-        const scanPromise = dynamodb.scan(params).promise();
-        return scanPromise.then((data) => {
-          let i;
-          for (i = 0; i < data.Items.length; i++) {
-             if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
-               if (data.Items[i].mapAttr.M.facebookID
-                  && data.Items[i].mapAttr.M.facebookID.S) {
-                 const entry = {};
-
-                 entry.id = data.Items[i].mapAttr.M.facebookID.S;
-                 if (data.Items[i].mapAttr.M.firstName
-                    && data.Items[i].mapAttr.M.firstName.S) {
-                   entry.name = data.Items[i].mapAttr.M.firstName.S;
-                 }
-                 if (data.Items[i].mapAttr.M.email
-                    && data.Items[i].mapAttr.M.email.S) {
-                   entry.email = data.Items[i].mapAttr.M.email.S;
-                 }
-                 users.push(entry);
-               }
-             }
-           }
-
-           if (data.LastEvaluatedKey) {
-             return loop(false, data.LastEvaluatedKey);
-           }
-         });
-      }
-    })(true, null).then(() => {
-      callback(users);
-    }).catch((err) => {
-      console.log(err.stack);
-      callback([]);
-    });
-  },
   updateRouletteScores: function() {
-    getRankFromDB((err, americanScores, europeanScores, tournamentScores, achievementScores) => {
+    getRankFromDB((err, americanScores, europeanScores,
+          tournamentScores, achievementScores, daysPlayed) => {
       if (!err) {
         const scoreData = {timestamp: Date.now(),
           achievementScores: achievementScores,
@@ -248,8 +163,15 @@ module.exports = {
       }
     });
   },
+  getAchievementScores: function(callback) {
+    getRankFromDB((err, americanScores, europeanScores, tournamentScores,
+          achievementScores, spins, daysPlayed) => {
+      callback(err, daysPlayed);
+    });
+  },
   closeTournament: function(callback) {
-    getRankFromDB((err, americanScores, europeanScores, tournamentScores, achievementScores, spins) => {
+    getRankFromDB((err, americanScores, europeanScores, tournamentScores,
+          achievementScores, spins, daysPlayed) => {
       if (err) {
         callback(err);
       } else {
@@ -287,6 +209,7 @@ function getRankFromDB(callback) {
   const europeanScores = [];
   const tournamentScores = [];
   const achievementScores = [];
+  const daysPlayed = {};
   let tournamentSpins = 0;
   let scoreData;
 
@@ -299,47 +222,46 @@ function getRankFromDB(callback) {
       if (firstRun || startKey) {
         params.ExclusiveStartKey = startKey;
 
-        const scanPromise = dynamodb.scan(params).promise();
+        const scanPromise = doc.scan(params).promise();
         return scanPromise.then((data) => {
           // OK, let's see where you rank among American and European players
           let i;
 
           for (i = 0; i < data.Items.length; i++) {
-            if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
-              const firstName = (data.Items[i].mapAttr.M.firstName)
-                ? data.Items[i].mapAttr.M.firstName.S
-                : undefined;
+            if (data.Items[i].mapAttr) {
+              const firstName = data.Items[i].mapAttr.firstName;
 
               // Calculate achievement score
               let achievementScore = 0;
-              if (data.Items[i].mapAttr.M.achievements
-                && data.Items[i].mapAttr.M.achievements.M) {
-                const achievements = data.Items[i].mapAttr.M.achievements.M;
-                if (achievements.trophy && achievements.trophy.N) {
-                 achievementScore += 100 * parseInt(achievements.trophy.N);
+              if (data.Items[i].mapAttr.achievements) {
+                const achievements = data.Items[i].mapAttr.achievements;
+                if (achievements.trophy) {
+                 achievementScore += 100 * parseInt(achievements.trophy);
                 }
-                if (achievements.daysPlayed && achievements.daysPlayed.N) {
-                 achievementScore += 10 * parseInt(achievements.daysPlayed.N);
+                if (achievements.daysPlayed) {
+                 const days = parseInt(achievements.daysPlayed);
+
+                 achievementScore += 10 * days;
+                 daysPlayed[days] = (daysPlayed[days] + 1) || 1;
                 }
-                if (achievements.streakScore && achievements.streakScore.N) {
-                 achievementScore += parseInt(achievements.streakScore.N);
+                if (achievements.streakScore) {
+                 achievementScore += parseInt(achievements.streakScore);
                 }
               }
               achievementScores.push(achievementScore);
 
-              if (data.Items[i].mapAttr.M.highScore
-                    && data.Items[i].mapAttr.M.highScore.M) {
+              if (data.Items[i].mapAttr.highScore) {
                 // This is the old-style format
                 // Only counts if they spinned
-                const score = data.Items[i].mapAttr.M.highScore.M;
-                const spinsAmerican = (score.spinsAmerican && score.spinsAmerican.N)
-                      ? parseInt(score.spinsAmerican.N) : 0;
-                const spinsEuropean = (score.spinsEuropean && score.spinsEuropean.N)
-                      ? parseInt(score.spinsEuropean.N) : 0;
-                const highAmerican = (score.currentAmerican && score.currentAmerican.N)
-                      ? parseInt(score.currentAmerican.N) : 0;
-                const highEuropean = (score.currentEuropean && score.currentEuropean.N)
-                  ? parseInt(score.currentEuropean.N) : 0;
+                const score = data.Items[i].mapAttr.highScore;
+                const spinsAmerican = (score.spinsAmerican)
+                      ? parseInt(score.spinsAmerican) : 0;
+                const spinsEuropean = (score.spinsEuropean)
+                      ? parseInt(score.spinsEuropean) : 0;
+                const highAmerican = (score.currentAmerican)
+                      ? parseInt(score.currentAmerican) : 0;
+                const highEuropean = (score.currentEuropean)
+                  ? parseInt(score.currentEuropean) : 0;
 
                  if (spinsAmerican) {
                    americanScores.push({name: firstName, bankroll: highAmerican});
@@ -350,43 +272,43 @@ function getRankFromDB(callback) {
               }
 
               // Check for new format
-              if (data.Items[i].mapAttr.M.american && data.Items[i].mapAttr.M.american.M) {
+              if (data.Items[i].mapAttr.american) {
                 // This is the new format
-                scoreData = data.Items[i].mapAttr.M.american.M;
-                const spins = (scoreData.spins && scoreData.spins.N)
-                      ? parseInt(scoreData.spins.N) : 0;
-                const high = (scoreData.bankroll && scoreData.bankroll.N)
-                      ? parseInt(scoreData.bankroll.N) : 0;
+                scoreData = data.Items[i].mapAttr.american;
+                const spins = (scoreData.spins)
+                      ? parseInt(scoreData.spins) : 0;
+                const high = (scoreData.bankroll)
+                      ? parseInt(scoreData.bankroll) : 0;
 
                 if (spins) {
                   americanScores.push({name: firstName, bankroll: high});
                 }
               }
 
-              if (data.Items[i].mapAttr.M.european && data.Items[i].mapAttr.M.european.M) {
+              if (data.Items[i].mapAttr.european) {
                 // This is the new format
-                scoreData = data.Items[i].mapAttr.M.european.M;
-                const spins = (scoreData.spins && scoreData.spins.N)
-                      ? parseInt(scoreData.spins.N) : 0;
-                const high = (scoreData.bankroll && scoreData.bankroll.N)
-                      ? parseInt(scoreData.bankroll.N) : 0;
+                scoreData = data.Items[i].mapAttr.european;
+                const spins = (scoreData.spins)
+                      ? parseInt(scoreData.spins) : 0;
+                const high = (scoreData.bankroll)
+                      ? parseInt(scoreData.bankroll) : 0;
 
                 if (spins) {
                   europeanScores.push({name: firstName, bankroll: high});
                 }
               }
 
-              if (data.Items[i].mapAttr.M.tournament && data.Items[i].mapAttr.M.tournament.M) {
+              if (data.Items[i].mapAttr.tournament) {
                 // This is the new format
-                scoreData = data.Items[i].mapAttr.M.tournament.M;
+                scoreData = data.Items[i].mapAttr.tournament;
 
                 // Only count tournament scores that are still active
-                if (scoreData.timestamp && scoreData.timestamp.N &&
-                    (parseInt(scoreData.timestamp.N) > tournamentClose)) {
-                  const spins = (scoreData.spins && scoreData.spins.N)
-                        ? parseInt(scoreData.spins.N) : 0;
-                  const high = (scoreData.bankroll && scoreData.bankroll.N)
-                        ? parseInt(scoreData.bankroll.N) : 0;
+                if (scoreData.timestamp &&
+                    (parseInt(scoreData.timestamp) > tournamentClose)) {
+                  const spins = (scoreData.spins)
+                        ? parseInt(scoreData.spins) : 0;
+                  const high = (scoreData.bankroll)
+                        ? parseInt(scoreData.bankroll) : 0;
 
                   if (spins) {
                     tournamentScores.push({name: firstName, bankroll: high});
@@ -407,10 +329,11 @@ function getRankFromDB(callback) {
       europeanScores.sort((a, b) => (b.bankroll - a.bankroll));
       tournamentScores.sort((a, b) => (b.bankroll - a.bankroll));
       achievementScores.sort((a, b) => (b - a));
-      callback(null, americanScores, europeanScores, tournamentScores, achievementScores, tournamentSpins);
+      callback(null, americanScores, europeanScores, tournamentScores,
+            achievementScores, tournamentSpins, daysPlayed);
     }).catch((err) => {
       console.log('Error scanning: ' + err);
-      callback(err, null, null, null);
+      callback(err);
     });
   });
 }
