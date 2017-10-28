@@ -42,15 +42,12 @@ module.exports = {
           }
         }
 
-        let registeredText = '';
-        if (registered.length) {
-          registeredText = 'The following individuals have registered: ' + speechUtils.and(registered) + '\r\n';
-        }
+        const rows = [];
 
-        text = 'Of ' + results.length + ' registered players ';
-        text += basicRecent + ' have played in the past 24 hours. ';
-        text += 'There have been a total of ' + numRounds + ' rounds played. ';
-        text += registeredText;
+        rows.push(utils.getSummaryTableRow('Total Players', results.length));
+        rows.push(utils.getSummaryTableRow('Past 24 Hours', basicRecent));
+        rows.push(utils.getSummaryTableRow('Rounds Played', numRounds));
+        text = utils.getSummaryTable('CRAPS', rows);
         text += utils.getAdText(newads);
         callback(text);
       }

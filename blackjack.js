@@ -42,10 +42,16 @@ module.exports = {
 
         // Get the progressive information for standard
         getProgressive('standard', (game, progressiveHands, jackpots) => {
-          text = 'Of ' + results.length + ' active players ';
-          text += standardRecent + ' have played in the past 24 hours. ';
-          text += 'There are ' + players['en-US'] + ' American players and ' + players['en-GB'] + ' UK players. ';
-          text += ('There have been ' + progressiveHands + ' hands played towards the progressive. The jackpot has been hit ' + jackpots + ' times.\r\n');
+          const rows = [];
+
+          rows.push(utils.getSummaryTableRow('Total Players', results.length));
+          rows.push(utils.getSummaryTableRow('Past 24 Hours', standardRecent));
+          rows.push(utils.getSummaryTableRow('American Players', players['en-US']));
+          rows.push(utils.getSummaryTableRow('UK Players', players['en-GB']));
+          rows.push(utils.getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));
+          rows.push(utils.getSummaryTableRow('Progressive Hands', progressiveHands));
+
+          text = utils.getSummaryTable('BLACKJACK', rows);
           text += utils.getAdText(newads);
           callback(text);
         });

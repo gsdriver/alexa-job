@@ -86,7 +86,7 @@ function getMailText(callback) {
   function completed() {
     toRun--;
     if (toRun === 0) {
-      const mailBody = 'BLACKJACK\r\n' + bjText + '\r\n\r\nROULETTE\r\n' + rouletteText + '\r\n\r\nSLOTS\r\n' + slotText + '\r\n\r\nVIDEO POKER\r\n' + pokerText + '\r\n\r\nCRAPS\r\n' + crapsText;
+      const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + '</HTML>';
       callback(mailBody);
     }
   }

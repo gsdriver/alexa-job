@@ -119,11 +119,18 @@ module.exports = {
          });
        }
       })(true, null).then(() => {
-        text = ('You have ' + american.players + ' players on an American wheel, ' + american.recentPlayers + ' of whom have played in the last 24 hours. ');
-        text += ('You have ' + european.players + ' players on a European wheel, ' + european.recentPlayers + ' of whom have played in the last 24 hours. ');
+        const rows = [];
+
+        rows.push(utils.getSummaryTableRow('American Players', american.players));
+        rows.push(utils.getSummaryTableRow('Past 24 Hours', american.recentPlayers));
+        rows.push(utils.getSummaryTableRow('European Players', european.players));
+        rows.push(utils.getSummaryTableRow('Past 24 Hours', european.recentPlayers));
         if (tournament.players) {
-          text += ('You have ' + tournament.players + ' people who have done ' + tournament.spins + ' total spins in the tournament with a high score of ' + tournament.high + ' units.\r\n');
+          rows.push(utils.getSummaryTableRow('Tournament Players', tournament.players));
+          rows.push(utils.getSummaryTableRow('Tournament Spins', tournament.spins));
         }
+
+        text = utils.getSummaryTable('ROULETTE', rows);
         text += utils.getAdText(adsPlayed);
         callback(text);
       }).catch((err) => {

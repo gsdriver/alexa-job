@@ -61,23 +61,22 @@ module.exports = {
         // Get the progressive jackpot
         let game;
         let readGames = 0;
+        const rows = [];
         for (game in games) {
           if (game) {
             getProgressive(game, (game, coins) => {
-              text += 'For ' + game + ' there are ' + games[game].players + ' total players ';
-              text += 'of whom ' + games[game].recentGames + ' have played in the past 24 hours.  ';
-              text += ('There have been a total of ' + games[game].totalSpins + ' spins and ' + games[game].totalJackpots + ' jackpots. ');
-              text += ('The high score is ' + games[game].highScore + ' coins. ');
-
+              rows.push(utils.getSummaryTableRow('Total ' + game + ' Players', games[game].players));
+              rows.push(utils.getSummaryTableRow('Past 24 Hours', games[game].recentGames));
+              rows.push(utils.getSummaryTableRow('Total Spins', games[game].totalSpins));
+              rows.push(utils.getSummaryTableRow('Jackpots', games[game].totalJackpots));
               if (coins && (coins > 0)) {
-                text += ('There are ' + coins + ' coins towards the next progressive jackpot. ');
+                rows.push(utils.getSummaryTableRow('Progressive Coins', coins));
               }
-
-              text += games[game].maxSpins + ' is the most spins played by one person.\r\n\r\n';
 
               // Are we done?
               readGames++;
               if (readGames === numGames) {
+                text = utils.getSummaryTable('SLOT MACHINE', rows);
                 text += utils.getAdText(newads);
                 callback(text);
               }
