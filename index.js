@@ -34,7 +34,7 @@ function sendEmail(text, callback) {
     },
     Message: {
       Body: {
-        Text: {
+        Html: {
           Data: text,
           Charset: 'UTF-8',
         },
