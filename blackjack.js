@@ -21,8 +21,9 @@ module.exports = {
       } else {
         let i;
         const players = {};
-        let standardRecent = 0;
+        let recentPlayers = 0;
         const now = Date.now();
+        let isRecent;
 
         for (i = 0; i < results.length; i++) {
           if (players[results[i].locale]) {
@@ -31,12 +32,23 @@ module.exports = {
             players[results[i].locale] = 1;
           }
 
+          isRecent = false;
           if (results[i].standard) {
             const standard = results[i].standard;
             if (standard.timestamp &&
               ((now - standard.timestamp) < 24*60*60*1000)) {
-              standardRecent++;
+              isRecent = true;
             }
+          }
+          if (results[i].tournament) {
+            const tournament = results[i].tournament;
+            if (tournament.timestamp &&
+              ((now - tournament.timestamp) < 24*60*60*1000)) {
+              isRecent = true;
+            }
+          }
+          if (isRecent) {
+            recentPlayers++;
           }
         }
 
@@ -45,7 +57,7 @@ module.exports = {
           const rows = [];
 
           rows.push(utils.getSummaryTableRow('Total Players', results.length));
-          rows.push(utils.getSummaryTableRow('Past 24 Hours', standardRecent));
+          rows.push(utils.getSummaryTableRow('Past 24 Hours', recentPlayers));
           rows.push(utils.getSummaryTableRow('American Players', players['en-US']));
           rows.push(utils.getSummaryTableRow('UK Players', players['en-GB']));
           rows.push(utils.getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));

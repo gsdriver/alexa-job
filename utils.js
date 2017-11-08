@@ -160,6 +160,10 @@ module.exports = {
         let i;
         text = 'Date,';
         for (i = 0; i < states.length; i++) {
+          text += states[i] + '%,';
+        }
+        text += ',';
+        for (i = 0; i < states.length; i++) {
           text += states[i] + ',';
         }
         text += '\n';
@@ -184,6 +188,14 @@ module.exports = {
                 text += ',';
               });
             }
+
+            text += ',';
+            states.forEach((state) => {
+              if (results[result][state]) {
+                text += results[result][state];
+              }
+              text += ',';
+            });
             text += '\n';
           }
         }

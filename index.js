@@ -18,9 +18,12 @@ AWS.config.update({
 });
 const SES = new AWS.SES();
 
+// 7 hours during DST, 8 hours outside of DST
+const tzOffset = 8;
+
 function sendEmail(text, callback) {
   const d = new Date();
-  d.setHours(d.getHours() - 7);
+  d.setHours(d.getHours() - tzOffset);
 
   const digestName = (d.getHours() < 12)
           ? 'Alexa Skill Usage Morning Digest'
@@ -109,7 +112,7 @@ if (process.env.RUNLOOP) {
 
     // Send mail around 5 AM and 5 PM
     const d = new Date();
-    d.setHours(d.getHours() - 7);
+    d.setHours(d.getHours() - tzOffset);
 
     if ((d.getHours() % 12) == 5) {
       if (!mailSent) {
