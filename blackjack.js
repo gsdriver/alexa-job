@@ -60,6 +60,7 @@ module.exports = {
           rows.push(utils.getSummaryTableRow('Past 24 Hours', recentPlayers));
           rows.push(utils.getSummaryTableRow('American Players', players['en-US']));
           rows.push(utils.getSummaryTableRow('UK Players', players['en-GB']));
+          rows.push(utils.getSummaryTableRow('Canadian Players', players['en-CA'] ? players['en-CA'] : 0));
           rows.push(utils.getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));
           rows.push(utils.getSummaryTableRow('Progressive Hands', progressiveHands));
 
