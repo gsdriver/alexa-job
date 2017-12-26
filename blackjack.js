@@ -103,6 +103,42 @@ module.exports = {
       }
     });
   },
+  getActivePlayers: function(callback) {
+    // An active player is one who played in the past week
+    getEntriesFromDB((err, results) => {
+      if (err) {
+        callback(err, null);
+      } else {
+        const players = [];
+        let timestamp;
+        const now = Date.now();
+
+        results.forEach((result) => {
+          timestamp = undefined;
+          if (result.standard) {
+            const standard = result.standard;
+            if (standard.timestamp &&
+              ((now - standard.timestamp) < 7*24*60*60*1000)) {
+              timestamp = standard.timestamp;
+            }
+          }
+          if (result.tournament) {
+            const tournament = result.tournament;
+            if (tournament.timestamp &&
+              ((now - tournament.timestamp) < 7*24*60*60*1000)) {
+              if (!timestamp || (tournament.timestamp > timestamp)) {
+                timestamp = tournament.timestamp;
+              }
+            }
+          }
+          if (timestamp) {
+            players.push({last: timestamp, first: result.firstPlay});
+          }
+        });
+        callback(null, players);
+      }
+    });
+  },
   updateBlackjackScores: function() {
     getEntriesFromDB((err, results, newads) => {
       if (!err) {
@@ -217,6 +253,7 @@ function getEntriesFromDB(callback) {
              const entry = {};
 
              // Calculate achievement score
+             entry.firstPlay = utils.getFirstPlayFromAds(data.Items[i].mapAttr.adsPlayed);
              entry.achievementScore = 0;
              if (data.Items[i].mapAttr.achievements) {
                const achievements = data.Items[i].mapAttr.achievements;

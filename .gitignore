@@ -7,3 +7,6 @@ content
 log*.csv
 bounce*.csv
 newusers.csv
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
