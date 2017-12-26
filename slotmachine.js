@@ -6,7 +6,7 @@
 
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
-const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
+const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const utils = require('./utils');
 
@@ -15,7 +15,7 @@ module.exports = {
   getSlotsMail: function(callback) {
     let text = '';
 
-    getEntriesFromDB((err, results, newads) => {
+    getEntriesFromDB((err, results, newads, players) => {
       if (err) {
         callback('Error getting slotmachine data: ' + err);
       } else {
@@ -62,6 +62,24 @@ module.exports = {
         let game;
         let readGames = 0;
         const rows = [];
+
+        rows.push(utils.getSummaryTableRow('Total Players', players['total']));
+        if (players['en-US']) {
+          rows.push(utils.getSummaryTableRow('American Players', players['en-US']));
+        }
+        if (players['en-GB']) {
+          rows.push(utils.getSummaryTableRow('British Players', players['en-GB']));
+        }
+        if (players['en-CA']) {
+          rows.push(utils.getSummaryTableRow('Canadian Players', players['en-CA']));
+        }
+        if (players['en-IN']) {
+          rows.push(utils.getSummaryTableRow('Indian Players', players['en-IN']));
+        }
+        if (players['en-AU']) {
+          rows.push(utils.getSummaryTableRow('Australian Players', players['en-AU']));
+        }
+
         for (game in games) {
           if (game) {
             getProgressive(game, (game, coins) => {
@@ -136,6 +154,7 @@ module.exports = {
 function getEntriesFromDB(callback) {
   const results = [];
   const newads = [];
+  const players = {};
 
   // Loop thru to read in all items from the DB
   (function loop(firstRun, startKey) {
@@ -144,16 +163,16 @@ function getEntriesFromDB(callback) {
     if (firstRun || startKey) {
       params.ExclusiveStartKey = startKey;
 
-      const scanPromise = dynamodb.scan(params).promise();
+      const scanPromise = doc.scan(params).promise();
       return scanPromise.then((data) => {
         let i;
 
-        utils.getAdSummary(data, newads);
+        utils.getAdSummaryDoc(data, newads);
         for (i = 0; i < data.Items.length; i++) {
-          if (data.Items[i].mapAttr && data.Items[i].mapAttr.M) {
+          if (data.Items[i].mapAttr) {
             let game;
 
-            for (game in data.Items[i].mapAttr.M) {
+            for (game in data.Items[i].mapAttr) {
               if (game) {
                 const entry = getEntryForGame(data.Items[i], game);
                 if (entry) {
@@ -161,6 +180,12 @@ function getEntriesFromDB(callback) {
                 }
               }
             }
+
+            const locale = data.Items[i].mapAttr.playerLocale;
+            if (locale) {
+              players[locale] = (players[locale] + 1) || 1;
+            }
+            players.total = (players.total + 1) || 1;
           }
         }
 
@@ -170,7 +195,7 @@ function getEntriesFromDB(callback) {
       });
     }
   })(true, null).then(() => {
-    callback(null, results, newads);
+    callback(null, results, newads, players);
   }).catch((err) => {
     callback(err, null), null;
   });
@@ -179,29 +204,27 @@ function getEntriesFromDB(callback) {
 function getEntryForGame(item, game) {
   let entry;
 
-  if (item.mapAttr && item.mapAttr.M
-    && item.mapAttr.M[game] && item.mapAttr.M[game].M) {
-     if (item.mapAttr.M[game].M.spins) {
-       const spins = parseInt(item.mapAttr.M[game].M.spins.N);
+  if (item.mapAttr && item.mapAttr[game]) {
+     if (item.mapAttr[game].spins) {
+       const spins = parseInt(item.mapAttr[game].spins);
 
        entry = {game: game};
        entry.spins = isNaN(spins) ? 0 : spins;
-       if (item.mapAttr.M[game].M.bankroll) {
-         const high = parseInt(item.mapAttr.M[game].M.bankroll.N);
+       if (item.mapAttr[game].bankroll) {
+         const high = parseInt(item.mapAttr[game].bankroll);
          entry.high = isNaN(high) ? 0 : high;
        }
 
-      if (item.mapAttr.M[game].M.jackpot) {
-        const jackpot = parseInt(item.mapAttr.M[game].M.jackpot.N);
+      if (item.mapAttr[game].jackpot) {
+        const jackpot = parseInt(item.mapAttr[game].jackpot);
 
         entry.jackpot = isNaN(jackpot) ? 0 : jackpot;
       } else {
         entry.jackpot = 0;
       }
 
-      if (item.mapAttr.M[game].M.timestamp
-        && item.mapAttr.M[game].M.timestamp.N) {
-        entry.timestamp = parseInt(item.mapAttr.M[game].M.timestamp.N);
+      if (item.mapAttr[game].timestamp) {
+        entry.timestamp = parseInt(item.mapAttr[game].timestamp);
       }
     }
   }
@@ -210,8 +233,8 @@ function getEntryForGame(item, game) {
 }
 
 function getProgressive(game, callback) {
-  // Read from Dynamodb
-  dynamodb.getItem({TableName: 'Slots', Key: {userId: {S: 'game-' + game}}},
+  // Read from database
+  doc.get({TableName: 'Slots', Key: {userId: {S: 'game-' + game}}},
           (err, data) => {
     if (err || (data.Item === undefined)) {
       callback(game, undefined);
@@ -219,8 +242,8 @@ function getProgressive(game, callback) {
       // Do we have
       let coins;
 
-      if (data.Item.coins && data.Item.coins.N) {
-        coins = parseInt(data.Item.coins.N);
+      if (data.Item.coins) {
+        coins = parseInt(data.Item.coins);
       }
 
       callback(game, coins);
