@@ -15,7 +15,7 @@ module.exports = {
   getSlotsMail: function(callback) {
     let text = '';
 
-    getEntriesFromDB((err, results, newads, players) => {
+    getEntriesFromDB((err, results, achievementScores, newads, players) => {
       if (err) {
         callback('Error getting slotmachine data: ' + err);
       } else {
@@ -105,7 +105,7 @@ module.exports = {
     });
   },
   updateSlotMachineScores: function() {
-    getEntriesFromDB((err, results, newads) => {
+    getEntriesFromDB((err, results, achievementScores, newads) => {
       if (!err) {
         const scoreData = {timestamp: Date.now()};
 
@@ -128,6 +128,8 @@ module.exports = {
           }
         }
 
+        achievementScores.sort((a, b) => (b - a));
+        scores.achievementScores = achievementScores;
         scoreData.scores = scores;
 
         // Only write high scores to S3 if they have changed
@@ -136,7 +138,7 @@ module.exports = {
             // It's not the same, so try to write it out
             const params = {Body: JSON.stringify(scoreData),
               Bucket: 'garrett-alexa-usage',
-              Key: 'SlotMachineScores2.txt'};
+              Key: 'SlotMachineScores.txt'};
 
             s3.putObject(params, (err, data) => {
               if (err) {
@@ -154,6 +156,7 @@ module.exports = {
 function getEntriesFromDB(callback) {
   const results = [];
   const newads = [];
+  const achievementScores = [];
   const players = {};
 
   // Loop thru to read in all items from the DB
@@ -181,6 +184,22 @@ function getEntriesFromDB(callback) {
               }
             }
 
+            if (data.Items[i].mapAttr.achievements) {
+              const achievements = data.Items[i].mapAttr.achievements;
+              let score = 0;
+
+              if (achievements.gamedaysPlayed) {
+                score += 10 * achievements.gamedaysPlayed;
+              }
+              if (achievements.jackpot) {
+                score += 25 * achievements.jackpot;
+              }
+              if (achievements.streakScore) {
+                score += achievements.streakScore;
+              }
+              achievementScores.push(score);
+            }
+
             const locale = data.Items[i].mapAttr.playerLocale;
             if (locale) {
               players[locale] = (players[locale] + 1) || 1;
@@ -195,7 +214,7 @@ function getEntriesFromDB(callback) {
       });
     }
   })(true, null).then(() => {
-    callback(null, results, newads, players);
+    callback(null, results, achievementScores, newads, players);
   }).catch((err) => {
     callback(err, null), null;
   });
@@ -253,7 +272,7 @@ function getProgressive(game, callback) {
 
 function checkScoreChange(newScores, callback) {
   // Read the S3 buckets that has everyone's scores
-  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'SlotMachineScores2.txt'}, (err, data) => {
+  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'SlotMachineScores.txt'}, (err, data) => {
     if (err) {
       console.log(err, err.stack);
       callback('error');
