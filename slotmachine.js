@@ -198,7 +198,6 @@ function getEntriesFromDB(callback) {
                 score += achievements.streakScore;
               }
             }
-            console.log(score);
             achievementScores.push(score);
 
             const locale = data.Items[i].mapAttr.playerLocale;
