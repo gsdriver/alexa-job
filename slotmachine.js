@@ -184,9 +184,9 @@ function getEntriesFromDB(callback) {
               }
             }
 
+            let score = 0;
             if (data.Items[i].mapAttr.achievements) {
               const achievements = data.Items[i].mapAttr.achievements;
-              let score = 0;
 
               if (achievements.gamedaysPlayed) {
                 score += 10 * achievements.gamedaysPlayed;
@@ -197,8 +197,9 @@ function getEntriesFromDB(callback) {
               if (achievements.streakScore) {
                 score += achievements.streakScore;
               }
-              achievementScores.push(score);
             }
+            console.log(score);
+            achievementScores.push(score);
 
             const locale = data.Items[i].mapAttr.playerLocale;
             if (locale) {
