@@ -160,6 +160,20 @@ if (process.env.RUNLOOP) {
             console.log('Rebuilt Blackjack Leaderboard');
           }
         });
+        utils.populateLeaderBoardFromDB('craps', (err) => {
+          if (err) {
+            console.log('Craps leaderboard rebuild error: ' + err);
+          } else {
+            console.log('Rebuilt Craps Leaderboard');
+          }
+        });
+        utils.populateLeaderBoardFromDB('videopoker', (err) => {
+          if (err) {
+            console.log('Videopoker leaderboard rebuild error: ' + err);
+          } else {
+            console.log('Rebuilt Videopoker Leaderboard');
+          }
+        });
       }
     } else {
       // Not Sunday at 1:00, so reset flag

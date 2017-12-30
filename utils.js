@@ -232,8 +232,24 @@ module.exports = {
       'craps': {dbName: 'Craps'},
     };
 
-    // First clear this cache
-    leaderBoard.zremrangebyrank('leaders-' + game, 0, -1, (err) => {
+    // First clear the caches
+    if (game === 'videopoker') {
+      leaderBoard.zremrangebyrank('leaders-videopoker-jacks', 0, -1, (err) => {
+        leaderBoard.zremrangebyrank('leaders-videopoker-deueces', 0, -1, (err) => {
+          cleared();
+        });
+      });
+    } else if (game === 'craps') {
+      leaderBoard.zremrangebyrank('leaders-craps-basic', 0, -1, (err) => {
+        cleared();
+      });
+    } else {
+      leaderBoard.zremrangebyrank('leaders-' + game, 0, -1, (err) => {
+        cleared();
+      });
+    }
+
+    function cleared() {
       // Loop thru to read in all items from the DB
       (function loop(firstRun, startKey) {
         const params = {TableName: gameData[game].dbName};
@@ -249,6 +265,25 @@ module.exports = {
                 if (achievementScore !== undefined) {
                   leaderBoard.zadd('leaders-' + game, achievementScore, item.userId);
                 }
+
+                if (game === 'videopoker') {
+                  let subGame;
+
+                  // For video poker, add for each game
+                  for (subGame in item.mapAttr) {
+                    if (item.mapAttr[subGame] && item.mapAttr[subGame].spins
+                      && item.mapAttr[subGame].bankroll) {
+                      leaderBoard.zadd('leaders-videopoker-' + subGame, item.mapAttr[subGame].bankroll, item.userId);
+                    }
+                  }
+                } else if (game === 'craps') {
+                  // For craps, add for basic if they haven't played
+                  if (item.mapAttr.basic.rounds || (item.mapAttr.basic.bankroll !== 1000)) {
+                    if (item.mapAttr.basic.bankroll) {
+                      leaderBoard.zadd('leaders-craps-basic', item.mapAttr.basic.bankroll, item.userId);
+                    }
+                  }
+                }
               }
             });
 
@@ -263,7 +298,7 @@ module.exports = {
         console.log('Error populating ' + game + ' leaderboard: ' + err);
         callback(err), null;
       });
-    });
+    }
   },
   getAchievementScore: function(game, attributes) {
     let achievementScore;
