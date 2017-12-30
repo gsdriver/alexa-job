@@ -99,6 +99,7 @@ if (process.env.RUNLOOP) {
   let mailSent;
   let closedRouletteTournament;
   let closedBlackjackTournament;
+  let rebuiltLeaderBoards;
   let loggedNewUsers;
 
   // Get the ranks every 5 minutes and write to S3 if successful
@@ -131,6 +132,38 @@ if (process.env.RUNLOOP) {
     } else {
       // Not 5:00 hour anymore, so reset mailSent
       mailSent = false;
+    }
+
+    // Repopulate leaderboards on Sundays after 1 AM
+    if ((d.getDay() == 0) && (d.getHours() == 1)) {
+      if (!rebuiltLeaderBoards) {
+        // First time in this hour!
+        rebuiltLeaderBoards = true;
+        utils.populateLeaderBoardFromDB('slots', (err) => {
+          if (err) {
+            console.log('Slots leaderboard rebuild error: ' + err);
+          } else {
+            console.log('Rebuilt Slots Leaderboard');
+          }
+        });
+        utils.populateLeaderBoardFromDB('roulette', (err) => {
+          if (err) {
+            console.log('Roulette leaderboard rebuild error: ' + err);
+          } else {
+            console.log('Rebuilt Roulette Leaderboard');
+          }
+        });
+        utils.populateLeaderBoardFromDB('blackjack', (err) => {
+          if (err) {
+            console.log('Blackjack leaderboard rebuild error: ' + err);
+          } else {
+            console.log('Rebuilt Blackjack Leaderboard');
+          }
+        });
+      }
+    } else {
+      // Not Sunday at 1:00, so reset flag
+      rebuiltLeaderBoards = false;
     }
 
     // Close the roulette tournament down on Fridays after 1 AM

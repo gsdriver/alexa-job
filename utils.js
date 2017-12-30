@@ -6,8 +6,11 @@
 
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
+const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
+const redis = require('redis');
+const leaderBoard = redis.createClient({host: process.env.REDISHOST});
 
 module.exports = {
   getAdSummary: function(data, adsPlayed) {
@@ -218,6 +221,99 @@ module.exports = {
       }
       callback(text);
     });
+  },
+  // Populates the leader board of a game from the DB
+  populateLeaderBoardFromDB: function(game, callback) {
+    const gameData = {
+      'blackjack': {dbName: 'PlayBlackjack'},
+      'slots': {dbName: 'Slots'},
+      'roulette': {dbName: 'RouletteWheel'},
+      'videopoker': {dbName: 'VideoPoker'},
+      'craps': {dbName: 'Craps'},
+    };
+
+    // First clear this cache
+    leaderBoard.zremrangebyrank('leaders-' + game, 0, -1, (err) => {
+      // Loop thru to read in all items from the DB
+      (function loop(firstRun, startKey) {
+        const params = {TableName: gameData[game].dbName};
+
+        if (firstRun || startKey) {
+          params.ExclusiveStartKey = startKey;
+
+          const scanPromise = doc.scan(params).promise();
+          return scanPromise.then((data) => {
+            data.Items.forEach((item) => {
+              if (item.mapAttr) {
+                const achievementScore = module.exports.getAchievementScore(game, item.mapAttr);
+                if (achievementScore !== undefined) {
+                  leaderBoard.zadd('leaders-' + game, achievementScore, item.userId);
+                }
+              }
+            });
+
+            if (data.LastEvaluatedKey) {
+              return loop(false, data.LastEvaluatedKey);
+            }
+          });
+        }
+      })(true, null).then(() => {
+        callback(null);
+      }).catch((err) => {
+        console.log('Error populating ' + game + ' leaderboard: ' + err);
+        callback(err), null;
+      });
+    });
+  },
+  getAchievementScore: function(game, attributes) {
+    let achievementScore;
+    const achievements = (attributes) ? attributes.achievements : undefined;
+
+    if (game === 'slots') {
+      achievementScore = 0;
+      if (achievements) {
+        if (achievements.gamedaysPlayed) {
+          achievementScore += 10 * achievements.gamedaysPlayed;
+        }
+        if (achievements.jackpot) {
+          achievementScore += 25 * achievements.jackpot;
+        }
+        if (achievements.streakScore) {
+          achievementScore += achievements.streakScore;
+        }
+      }
+    } else if (game === 'blackjack') {
+      achievementScore = 0;
+      if (achievements) {
+        if (achievements.trophy) {
+          achievementScore += 100 * parseInt(achievements.trophy);
+        }
+        if (achievements.daysPlayed) {
+          achievementScore += 10 * parseInt(achievements.daysPlayed);
+        }
+        if (achievements.naturals) {
+          achievementScore += 5 * parseInt(achievements.naturals);
+        }
+        if (achievements.streakScore) {
+          achievementScore += parseInt(achievements.streakScore);
+        }
+      }
+    } else if (game === 'roulette') {
+      achievementScore = 0;
+      if (achievements) {
+        if (achievements.trophy) {
+          achievementScore += 100 * parseInt(achievements.trophy);
+        }
+        if (achievements.daysPlayed) {
+          achievementScore += 10 * parseInt(achievements.daysPlayed);
+        }
+        if (achievements.streakScore) {
+          achievementScore += parseInt(achievements.streakScore);
+        }
+      }
+    }
+
+    return achievementScore;
   },
 };
 

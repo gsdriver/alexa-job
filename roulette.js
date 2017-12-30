@@ -239,21 +239,11 @@ function getRankFromDB(callback) {
               const firstName = data.Items[i].mapAttr.firstName;
 
               // Calculate achievement score
-              let achievementScore = 0;
-              if (data.Items[i].mapAttr.achievements) {
-                const achievements = data.Items[i].mapAttr.achievements;
-                if (achievements.trophy) {
-                 achievementScore += 100 * parseInt(achievements.trophy);
-                }
-                if (achievements.daysPlayed) {
-                 const days = parseInt(achievements.daysPlayed);
-
-                 achievementScore += 10 * days;
-                 daysPlayed[days] = (daysPlayed[days] + 1) || 1;
-                }
-                if (achievements.streakScore) {
-                 achievementScore += parseInt(achievements.streakScore);
-                }
+              const achievementScore = utils.getAchievementScore('roulette', data.Items[i].mapAttr);
+              if (data.Items[i].mapAttr.achievements
+                && data.Items[i].mapAttr.achievements.daysPlayed) {
+                const days = parseInt(data.Items[i].mapAttr.achievements.daysPlayed);
+                daysPlayed[days] = (daysPlayed[days] + 1) || 1;
               }
               achievementScores.push(achievementScore);
 

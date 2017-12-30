@@ -184,20 +184,7 @@ function getEntriesFromDB(callback) {
               }
             }
 
-            let score = 0;
-            if (data.Items[i].mapAttr.achievements) {
-              const achievements = data.Items[i].mapAttr.achievements;
-
-              if (achievements.gamedaysPlayed) {
-                score += 10 * achievements.gamedaysPlayed;
-              }
-              if (achievements.jackpot) {
-                score += 25 * achievements.jackpot;
-              }
-              if (achievements.streakScore) {
-                score += achievements.streakScore;
-              }
-            }
+            const score = utils.getAchievementScore('slots', data.Items[i].mapAttr);
             achievementScores.push(score);
 
             const locale = data.Items[i].mapAttr.playerLocale;

@@ -254,23 +254,12 @@ function getEntriesFromDB(callback) {
 
              // Calculate achievement score
              entry.firstPlay = utils.getFirstPlayFromAds(data.Items[i].mapAttr.adsPlayed);
-             entry.achievementScore = 0;
-             if (data.Items[i].mapAttr.achievements) {
-               const achievements = data.Items[i].mapAttr.achievements;
-               if (achievements.trophy) {
-                 entry.achievementScore += 100 * parseInt(achievements.trophy);
-               }
-               if (achievements.daysPlayed) {
-                 entry.achievementScore += 10 * parseInt(achievements.daysPlayed);
-                 entry.daysPlayed = parseInt(achievements.daysPlayed);
-               }
-               if (achievements.naturals) {
-                 entry.achievementScore += 5 * parseInt(achievements.naturals);
-               }
-               if (achievements.streakScore) {
-                 entry.achievementScore += parseInt(achievements.streakScore);
-               }
+             entry.achievementScore = utils.getAchievementScore('blackjack', data.Items[i].mapAttr);
+             if (data.Items[i].mapAttr.achievements
+                && data.Items[i].mapAttr.achievements.daysPlayed) {
+               entry.daysPlayed = parseInt(data.Items[i].mapAttr.achievements.daysPlayed);
              }
+
              if (data.Items[i].mapAttr.numRounds) {
                entry.numRounds = parseInt(data.Items[i].mapAttr.numRounds);
              }
