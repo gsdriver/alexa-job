@@ -182,6 +182,8 @@ module.exports = {
     });
   },
   closeTournament: function(callback) {
+    // Clear the redis cache
+    utils.clearLeaderBoard('blackjack', 'tournament');
     getEntriesFromDB((err, results, newads) => {
       if (err) {
         callback(err);

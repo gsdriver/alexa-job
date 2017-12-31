@@ -106,10 +106,7 @@ if (process.env.RUNLOOP) {
   setInterval(() => {
     // Write to S3
     roulette.updateRouletteScores();
-    slotmachine.updateSlotMachineScores();
     blackjack.updateBlackjackScores();
-    videopoker.updatePokerScores();
-    craps.updateCrapsScores();
 
     // Send mail around 5 AM and 5 PM
     const d = new Date();

@@ -177,6 +177,8 @@ module.exports = {
     });
   },
   closeTournament: function(callback) {
+    // Clear the redis cache
+    utils.clearLeaderBoard('roulette', 'tournament');
     getRankFromDB((err, americanScores, europeanScores, tournamentScores,
           achievementScores, spins, daysPlayed) => {
       if (err) {

@@ -350,6 +350,14 @@ module.exports = {
 
     return achievementScore;
   },
+  clearLeaderBoard: function(game, subGame, callback) {
+    let board = 'leaders-' + game;
+    if (subGame) {
+      board += ('-' + subGame);
+    }
+
+    leaderBoard.zremrangebyrank(board, 0, -1, callback);
+  },
 };
 
 function getLastStates(skill, callback) {
