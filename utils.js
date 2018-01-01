@@ -222,84 +222,6 @@ module.exports = {
       callback(text);
     });
   },
-  // Populates the leader board of a game from the DB
-  populateLeaderBoardFromDB: function(game, callback) {
-    const gameData = {
-      'blackjack': {dbName: 'PlayBlackjack'},
-      'slots': {dbName: 'Slots'},
-      'roulette': {dbName: 'RouletteWheel'},
-      'videopoker': {dbName: 'VideoPoker'},
-      'craps': {dbName: 'Craps'},
-    };
-
-    // First clear the caches
-    if (game === 'videopoker') {
-      leaderBoard.zremrangebyrank('leaders-videopoker-jacks', 0, -1, (err) => {
-        leaderBoard.zremrangebyrank('leaders-videopoker-deueces', 0, -1, (err) => {
-          cleared();
-        });
-      });
-    } else if (game === 'craps') {
-      leaderBoard.zremrangebyrank('leaders-craps-basic', 0, -1, (err) => {
-        cleared();
-      });
-    } else {
-      leaderBoard.zremrangebyrank('leaders-' + game, 0, -1, (err) => {
-        cleared();
-      });
-    }
-
-    function cleared() {
-      // Loop thru to read in all items from the DB
-      (function loop(firstRun, startKey) {
-        const params = {TableName: gameData[game].dbName};
-
-        if (firstRun || startKey) {
-          params.ExclusiveStartKey = startKey;
-
-          const scanPromise = doc.scan(params).promise();
-          return scanPromise.then((data) => {
-            data.Items.forEach((item) => {
-              if (item.mapAttr) {
-                const achievementScore = module.exports.getAchievementScore(game, item.mapAttr);
-                if (achievementScore !== undefined) {
-                  leaderBoard.zadd('leaders-' + game, achievementScore, item.userId);
-                }
-
-                if (game === 'videopoker') {
-                  let subGame;
-
-                  // For video poker, add for each game
-                  for (subGame in item.mapAttr) {
-                    if (item.mapAttr[subGame] && item.mapAttr[subGame].spins
-                      && item.mapAttr[subGame].bankroll) {
-                      leaderBoard.zadd('leaders-videopoker-' + subGame, item.mapAttr[subGame].bankroll, item.userId);
-                    }
-                  }
-                } else if (game === 'craps') {
-                  // For craps, add for basic if they haven't played
-                  if (item.mapAttr.basic.rounds || (item.mapAttr.basic.bankroll !== 1000)) {
-                    if (item.mapAttr.basic.bankroll) {
-                      leaderBoard.zadd('leaders-craps-basic', item.mapAttr.basic.bankroll, item.userId);
-                    }
-                  }
-                }
-              }
-            });
-
-            if (data.LastEvaluatedKey) {
-              return loop(false, data.LastEvaluatedKey);
-            }
-          });
-        }
-      })(true, null).then(() => {
-        callback(null);
-      }).catch((err) => {
-        console.log('Error populating ' + game + ' leaderboard: ' + err);
-        callback(err), null;
-      });
-    }
-  },
   getAchievementScore: function(game, attributes) {
     let achievementScore;
     const achievements = (attributes) ? attributes.achievements : undefined;
@@ -357,6 +279,63 @@ module.exports = {
     }
 
     leaderBoard.zremrangebyrank(board, 0, -1, callback);
+  },
+  rebuildLeaderBoards: function(callback) {
+    const gameDatabases = {
+      'blackjack': 'PlayBlackjack',
+      'slots': 'Slots',
+      'roulette': 'RouletteWheel',
+      'videopoker': 'VideoPoker',
+      'craps': 'Craps',
+    };
+    let numCalls = 0;
+    let game;
+
+    // First check the rebuild file to see if we should rebuild
+    // We rebuild once a week - so if the current time is more than
+    // a week from the last rebuild, then build now
+    s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'LeaderBoardBuild.txt'}, (err, data) => {
+      if (err) {
+        callback(err);
+      } else {
+        const build = JSON.parse(data.Body.toString('ascii'));
+        if (build.timestamp === undefined) {
+          callback('No timestamp in build file');
+        } else {
+          const now = Date.now();
+
+          if (now - build.timestamp > 7*24*60*60*1000) {
+            // We will rebuild
+            for (game in gameDatabases) {
+              if (gameDatabases[game]) {
+                numCalls++;
+                populateLeaderBoardFromDB(game, gameDatabases[game], (err) => {
+                  if (--numCalls === 0) {
+                    completed();
+                  }
+                });
+              }
+            }
+
+            function completed() {
+              // Write out that we built
+              const params = {Body: JSON.stringify({timestamp: now}),
+                Bucket: 'garrett-alexa-usage',
+                Key: 'LeaderBoardBuild.txt'};
+
+              s3.putObject(params, (err, data) => {
+                if (callback) {
+                  callback(null, now);
+                }
+              });
+            }
+          } else {
+            // No error - no need to write
+            callback(null, 0);
+          }
+        }
+      }
+    });
   },
 };
 
@@ -492,4 +471,75 @@ function getFormattedDate(date) {
   const day = date.getDate().toString();
 
   return month + '/' + day + '/' + year;
+}
+
+// Populates the leader board of a game from the DB
+function populateLeaderBoardFromDB(game, dbName, callback) {
+  // First clear the caches
+  if (game === 'videopoker') {
+    leaderBoard.zremrangebyrank('leaders-videopoker-jacks', 0, -1, (err) => {
+      leaderBoard.zremrangebyrank('leaders-videopoker-deueces', 0, -1, (err) => {
+        cleared();
+      });
+    });
+  } else if (game === 'craps') {
+    leaderBoard.zremrangebyrank('leaders-craps-basic', 0, -1, (err) => {
+      cleared();
+    });
+  } else {
+    leaderBoard.zremrangebyrank('leaders-' + game, 0, -1, (err) => {
+      cleared();
+    });
+  }
+
+  function cleared() {
+    // Loop thru to read in all items from the DB
+    (function loop(firstRun, startKey) {
+      const params = {TableName: dbName};
+
+      if (firstRun || startKey) {
+        params.ExclusiveStartKey = startKey;
+
+        const scanPromise = doc.scan(params).promise();
+        return scanPromise.then((data) => {
+          data.Items.forEach((item) => {
+            if (item.mapAttr) {
+              const achievementScore = module.exports.getAchievementScore(game, item.mapAttr);
+              if (achievementScore !== undefined) {
+                leaderBoard.zadd('leaders-' + game, achievementScore, item.userId);
+              }
+
+              if (game === 'videopoker') {
+                let subGame;
+
+                // For video poker, add for each game
+                for (subGame in item.mapAttr) {
+                  if (item.mapAttr[subGame] && item.mapAttr[subGame].spins
+                    && item.mapAttr[subGame].bankroll) {
+                    leaderBoard.zadd('leaders-videopoker-' + subGame, item.mapAttr[subGame].bankroll, item.userId);
+                  }
+                }
+              } else if (game === 'craps') {
+                // For craps, add for basic if they haven't played
+                if (item.mapAttr.basic.rounds || (item.mapAttr.basic.bankroll !== 1000)) {
+                  if (item.mapAttr.basic.bankroll) {
+                    leaderBoard.zadd('leaders-craps-basic', item.mapAttr.basic.bankroll, item.userId);
+                  }
+                }
+              }
+            }
+          });
+
+          if (data.LastEvaluatedKey) {
+            return loop(false, data.LastEvaluatedKey);
+          }
+        });
+      }
+    })(true, null).then(() => {
+      callback(null);
+    }).catch((err) => {
+      console.log('Error populating ' + game + ' leaderboard: ' + err);
+      callback(err), null;
+    });
+  }
 }
