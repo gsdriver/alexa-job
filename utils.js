@@ -299,12 +299,12 @@ module.exports = {
         callback(err);
       } else {
         const build = JSON.parse(data.Body.toString('ascii'));
-        if (build.timestamp === undefined) {
+        if ((build.timestamp === undefined) && (build.force === undefined)) {
           callback('No timestamp in build file');
         } else {
           const now = Date.now();
 
-          if (now - build.timestamp > 7*24*60*60*1000) {
+          if (build.force || (now - build.timestamp > 7*24*60*60*1000)) {
             // We will rebuild
             for (game in gameDatabases) {
               if (gameDatabases[game]) {
