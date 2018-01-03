@@ -102,10 +102,20 @@ module.exports = {
     htmlText += tableEnd;
     return htmlText;
   },
-  getSummaryTableRow: function(firstColumn, secondColumn) {
+  getSummaryTableRow: function(firstColumn, secondColumn, formatting) {
     const rowFormat = '<tr style=\'mso-yfti-irow:0\'><td width=143 valign=top style=\'width:107.6pt;border:solid white 1.0pt;mso-border-themecolor:background1;border-top:none;mso-border-top-alt:solid white .5pt;mso-border-top-themecolor:background1;mso-border-alt:solid white .5pt;mso-border-themecolor:background1;background:#70AD47;mso-background-themecolor:accent6;padding:0in 5.4pt 0in 5.4pt\'><p class=MsoNormal style=\'mso-yfti-cnfc:68\'><b><span style=\'color:white;mso-themecolor:background1\'>{0}<o:p></o:p></span></b></p></td><td width=258 valign=top style=\'width:193.5pt;border-top:none;border-left:none;border-bottom:solid white 1.0pt;mso-border-bottom-themecolor:background1;border-right:solid white 1.0pt;mso-border-right-themecolor:background1;mso-border-top-alt:solid white .5pt;mso-border-top-themecolor:background1;mso-border-left-alt:solid white .5pt;mso-border-left-themecolor:background1;mso-border-alt:solid white .5pt;mso-border-themecolor:background1;background:#C5E0B3;mso-background-themecolor:accent6;mso-background-themetint:102;padding:0in 5.4pt 0in 5.4pt\'><p class=MsoNormal style=\'mso-yfti-cnfc:64\'>{1}</p></td></tr>';
+    let first = firstColumn;
+    let second = secondColumn;
 
-    return rowFormat.replace('{0}', firstColumn).replace('{1}', secondColumn);
+    if (formatting) {
+      if (formatting.boldFirstColumn) {
+        first = '<b>' + first + '</b>';
+      }
+      if (formatting.boldSecondColumn) {
+        second = '<b>' + second + '</b>';
+      }
+    }
+    return rowFormat.replace('{0}', first).replace('{1}', second);
   },
   saveNewUsers: function() {
     const now = Date.now();

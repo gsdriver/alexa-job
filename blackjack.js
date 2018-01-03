@@ -57,7 +57,7 @@ module.exports = {
           const rows = [];
 
           rows.push(utils.getSummaryTableRow('Total Players', results.length));
-          rows.push(utils.getSummaryTableRow('Past 24 Hours', recentPlayers));
+          rows.push(utils.getSummaryTableRow('Past 24 Hours', recentPlayers, {boldSecondColumn: true}));
           rows.push(utils.getSummaryTableRow('American Players', players['en-US']));
           rows.push(utils.getSummaryTableRow('UK Players', players['en-GB']));
           rows.push(utils.getSummaryTableRow('Canadian Players', players['en-CA'] ? players['en-CA'] : 0));

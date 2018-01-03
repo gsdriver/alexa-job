@@ -45,7 +45,7 @@ module.exports = {
         const rows = [];
 
         rows.push(utils.getSummaryTableRow('Total Players', results.length));
-        rows.push(utils.getSummaryTableRow('Past 24 Hours', basicRecent));
+        rows.push(utils.getSummaryTableRow('Past 24 Hours', basicRecent, {boldSecondColumn: true}));
         rows.push(utils.getSummaryTableRow('Rounds Played', numRounds));
         text = utils.getSummaryTable('CRAPS', rows);
         text += utils.getAdText(newads);

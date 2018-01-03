@@ -84,7 +84,7 @@ module.exports = {
           if (game) {
             getProgressive(game, (game, coins) => {
               rows.push(utils.getSummaryTableRow('Total ' + game + ' Players', games[game].players));
-              rows.push(utils.getSummaryTableRow('Past 24 Hours', games[game].recentGames));
+              rows.push(utils.getSummaryTableRow('Past 24 Hours', games[game].recentGames, {boldSecondColumn: true}));
               rows.push(utils.getSummaryTableRow('Total Spins', games[game].totalSpins));
               rows.push(utils.getSummaryTableRow('Jackpots', games[game].totalJackpots));
               if (coins && (coins > 0)) {

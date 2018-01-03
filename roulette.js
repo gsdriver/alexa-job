@@ -122,9 +122,9 @@ module.exports = {
         const rows = [];
 
         rows.push(utils.getSummaryTableRow('American Players', american.players));
-        rows.push(utils.getSummaryTableRow('Past 24 Hours', american.recentPlayers));
+        rows.push(utils.getSummaryTableRow('Past 24 Hours', american.recentPlayers, {boldSecondColumn: true}));
         rows.push(utils.getSummaryTableRow('European Players', european.players));
-        rows.push(utils.getSummaryTableRow('Past 24 Hours', european.recentPlayers));
+        rows.push(utils.getSummaryTableRow('Past 24 Hours', european.recentPlayers, {boldSecondColumn: true}));
         if (tournament.players) {
           rows.push(utils.getSummaryTableRow('Tournament Players', tournament.players));
           rows.push(utils.getSummaryTableRow('Tournament Spins', tournament.spins));

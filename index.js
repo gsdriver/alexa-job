@@ -105,7 +105,6 @@ if (process.env.RUNLOOP) {
   setInterval(() => {
     // Write to S3
     roulette.updateRouletteScores();
-    blackjack.updateBlackjackScores();
 
     // Check if leaderboards need to be re-written
     utils.rebuildLeaderBoards((err, timestamp) => {
