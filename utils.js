@@ -328,7 +328,11 @@ module.exports = {
             }
 
             function completed() {
-              // Write out that we built
+              // Write out that we built - only change timestamp if we weren't forced to run
+              if (build.force) {
+                now = build.timestamp;
+              }
+
               const params = {Body: JSON.stringify({timestamp: now}),
                 Bucket: 'garrett-alexa-usage',
                 Key: 'LeaderBoardBuild.txt'};
@@ -496,6 +500,18 @@ function populateLeaderBoardFromDB(game, dbName, callback) {
     leaderBoard.zremrangebyrank('leaders-craps-basic', 0, -1, (err) => {
       cleared();
     });
+  } else if (game === 'slots') {
+    leaderBoard.zremrangebyrank('leaders-slots', 0, -1, (err) => {
+      leaderBoard.zremrangebyrank('leaders-slots-wild', 0, -1, (err) => {
+        leaderBoard.zremrangebyrank('leaders-slots-progressive', 0, -1, (err) => {
+          leaderBoard.zremrangebyrank('leaders-slots-basic', 0, -1, (err) => {
+            leaderBoard.zremrangebyrank('leaders-slots-loose', 0, -1, (err) => {
+              cleared();
+            });
+          });
+        });
+      });
+    });
   } else {
     leaderBoard.zremrangebyrank('leaders-' + game, 0, -1, (err) => {
       cleared();
@@ -519,14 +535,14 @@ function populateLeaderBoardFromDB(game, dbName, callback) {
                 leaderBoard.zadd('leaders-' + game, achievementScore, item.userId);
               }
 
-              if (game === 'videopoker') {
+              // For video poker and slots, add for each game
+              if ((game === 'videopoker') || (game === 'slots')) {
                 let subGame;
 
-                // For video poker, add for each game
                 for (subGame in item.mapAttr) {
                   if (item.mapAttr[subGame] && item.mapAttr[subGame].spins
                     && item.mapAttr[subGame].bankroll) {
-                    leaderBoard.zadd('leaders-videopoker-' + subGame, item.mapAttr[subGame].bankroll, item.userId);
+                    leaderBoard.zadd('leaders-' + game + '-' + subGame, item.mapAttr[subGame].bankroll, item.userId);
                   }
                 }
               } else if (game === 'craps') {
