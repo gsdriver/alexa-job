@@ -312,7 +312,7 @@ module.exports = {
         if ((build.timestamp === undefined) && (build.force === undefined)) {
           callback('No timestamp in build file');
         } else {
-          const now = Date.now();
+          let now = Date.now();
 
           if (build.force || (now - build.timestamp > 7*24*60*60*1000)) {
             // We will rebuild
