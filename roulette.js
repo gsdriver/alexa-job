@@ -16,6 +16,7 @@ module.exports = {
     const american = {players: 0, recentPlayers: 0};
     const european = {players: 0, recentPlayers: 0};
     const tournament = {high: 0, spins: 0, players: 0};
+    const players = {};
     const adsPlayed = {};
     let spins;
     let text;
@@ -37,6 +38,12 @@ module.exports = {
             utils.getAdSummaryDoc(data, adsPlayed);
             for (i = 0; i < data.Items.length; i++) {
                if (data.Items[i].mapAttr) {
+                 const locale = data.Items[i].mapAttr.playerLocale;
+                 if (locale) {
+                   players[locale] = (players[locale] + 1) || 1;
+                 }
+                 players.total = (players.total + 1) || 1;
+
                  if (data.Items[i].mapAttr.highScore) {
                    // Only counts if they spinned
                    const score = data.Items[i].mapAttr.highScore;
@@ -121,9 +128,26 @@ module.exports = {
       })(true, null).then(() => {
         const rows = [];
 
-        rows.push(utils.getSummaryTableRow('American Players', american.players));
+        rows.push(utils.getSummaryTableRow('Total Players', players['total']));
+        if (players['en-US']) {
+          rows.push(utils.getSummaryTableRow('American Players', players['en-US']));
+        }
+        if (players['en-GB']) {
+          rows.push(utils.getSummaryTableRow('British Players', players['en-GB']));
+        }
+        if (players['en-CA']) {
+          rows.push(utils.getSummaryTableRow('Canadian Players', players['en-CA']));
+        }
+        if (players['en-IN']) {
+          rows.push(utils.getSummaryTableRow('Indian Players', players['en-IN']));
+        }
+        if (players['en-AU']) {
+          rows.push(utils.getSummaryTableRow('Australian Players', players['en-AU']));
+        }
+
+        rows.push(utils.getSummaryTableRow('American Wheel Players', american.players));
         rows.push(utils.getSummaryTableRow('Past 24 Hours', american.recentPlayers, {boldSecondColumn: true}));
-        rows.push(utils.getSummaryTableRow('European Players', european.players));
+        rows.push(utils.getSummaryTableRow('European Wheel Players', european.players));
         rows.push(utils.getSummaryTableRow('Past 24 Hours', european.recentPlayers, {boldSecondColumn: true}));
         if (tournament.players) {
           rows.push(utils.getSummaryTableRow('Tournament Players', tournament.players));

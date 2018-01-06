@@ -103,9 +103,6 @@ if (process.env.RUNLOOP) {
 
   // Get the ranks every 5 minutes and write to S3 if successful
   setInterval(() => {
-    // Write to S3
-    roulette.updateRouletteScores();
-
     // Check if leaderboards need to be re-written
     utils.rebuildLeaderBoards((err, timestamp) => {
       if (err) {
