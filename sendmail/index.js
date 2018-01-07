@@ -16,8 +16,15 @@ const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const ONEDAY = 24*60*60*1000;
 
 exports.handler = function(event, context, callback) {
+  // Note if this is triggered by an s3 upload
+  if (event.Records && (event.Records.length > 0)) {
+    if (event.Records[0].s3 && event.Records[0].s3.object) {
+      console.log('Send mail triggered by ' + event.Records[0].s3.object.key);
+    }
+  }
+  context.callbackWaitsForEmptyEventLoop = false;
+
   getMailText((mailBody) => {
-    console.log('Built mail: ' + mailBody);
     sendEmail(mailBody, (err, data) => {
       if (err) {
         console.log('Error sending mail ' + err.stack);

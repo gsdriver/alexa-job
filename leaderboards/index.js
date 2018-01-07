@@ -7,21 +7,23 @@
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
-const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 const redis = require('redis');
-let leaderBoard;
+const leaderBoard = redis.createClient({host: process.env.REDISHOST});
 
-exports.handler = function(event, context) {
-  rebuildLeaderBoards((err, timestamp) => {
-    if (err) {
-      console.log('Error writing boards');
-      context.fail(err);
-    } else {
-      if (timestamp) {
-        console.log('Wrote leader boards at ' + timestamp);
-      }
-      context.succeed();
+exports.handler = function(event, context, callback) {
+  // Note if this is triggered by an s3 upload
+  if (event.Records && (event.Records.length > 0)) {
+    if (event.Records[0].s3 && event.Records[0].s3.object) {
+      console.log('Leaderboards triggered by ' + event.Records[0].s3.object.key);
     }
+  }
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  rebuildLeaderBoards(() => {
+    // Close redis connection and callback
+    console.log('Done!');
+    leaderBoard.quit();
+    callback();
   });
 };
 
@@ -36,61 +38,17 @@ function rebuildLeaderBoards(callback) {
   let numCalls = 0;
   let game;
 
-  // First check the rebuild file to see if we should rebuild
-  // We rebuild once a week - so if the current time is more than
-  // a week from the last rebuild, then build now
-  s3.getObject({Bucket: 'garrett-alexa-usage', Key: 'LeaderBoardBuild.txt'}, (err, data) => {
-    if (err) {
-      callback(err);
-    } else {
-      const build = JSON.parse(data.Body.toString('ascii'));
-      if ((build.timestamp === undefined) && (build.force === undefined)) {
-        callback('No timestamp in build file');
-      } else {
-        let now = Date.now();
-
-        if (build.force || (now - build.timestamp > 7*24*60*60*1000)) {
-          // Connect to redis
-          leaderBoard = redis.createClient({host: process.env.REDISHOST});
-
-          // We will rebuild
-          for (game in gameDatabases) {
-            if (gameDatabases[game]) {
-              numCalls++;
-              populateLeaderBoardFromDB(game, gameDatabases[game], (err) => {
-                if (--numCalls === 0) {
-                  completed();
-                }
-              });
-            }
-          }
-
-          function completed() {
-            // Close redis connection
-            leaderBoard.quit();
-
-            // Write out that we built - only change timestamp if we weren't forced to run
-            if (build.force) {
-              now = build.timestamp;
-            }
-
-            const params = {Body: JSON.stringify({timestamp: now}),
-              Bucket: 'garrett-alexa-usage',
-              Key: 'LeaderBoardBuild.txt'};
-
-            s3.putObject(params, (err, data) => {
-              if (callback) {
-                callback(null, now);
-              }
-            });
-          }
-        } else {
-          // No error - no need to write
-          callback(null, 0);
+  // We will rebuild
+  for (game in gameDatabases) {
+    if (gameDatabases[game]) {
+      numCalls++;
+      populateLeaderBoardFromDB(game, gameDatabases[game], (err) => {
+        if (--numCalls === 0) {
+          callback();
         }
-      }
+      });
     }
-  });
+  }
 }
 
 // Populates the leader board of a game from the DB
@@ -125,55 +83,72 @@ function populateLeaderBoardFromDB(game, dbName, callback) {
   }
 
   function cleared() {
-    // Loop thru to read in all items from the DB
-    (function loop(firstRun, startKey) {
-      const params = {TableName: dbName};
+    processDBEntries(dbName,
+      (item) => {
+        const achievementScore = getAchievementScore(game, item.mapAttr);
+        if (achievementScore !== undefined) {
+          leaderBoard.zadd('leaders-' + game, achievementScore, item.userId);
+        }
 
-      if (firstRun || startKey) {
-        params.ExclusiveStartKey = startKey;
+        // For video poker and slots, add for each game
+        if ((game === 'videopoker') || (game === 'slots')) {
+          let subGame;
 
-        const scanPromise = doc.scan(params).promise();
-        return scanPromise.then((data) => {
-          data.Items.forEach((item) => {
-            if (item.mapAttr) {
-              const achievementScore = getAchievementScore(game, item.mapAttr);
-              if (achievementScore !== undefined) {
-                leaderBoard.zadd('leaders-' + game, achievementScore, item.userId);
-              }
-
-              // For video poker and slots, add for each game
-              if ((game === 'videopoker') || (game === 'slots')) {
-                let subGame;
-
-                for (subGame in item.mapAttr) {
-                  if (item.mapAttr[subGame] && item.mapAttr[subGame].spins
-                    && item.mapAttr[subGame].bankroll) {
-                    leaderBoard.zadd('leaders-' + game + '-' + subGame, item.mapAttr[subGame].bankroll, item.userId);
-                  }
-                }
-              } else if (game === 'craps') {
-                // For craps, add for basic if they haven't played
-                if (item.mapAttr.basic.rounds || (item.mapAttr.basic.bankroll !== 1000)) {
-                  if (item.mapAttr.basic.bankroll) {
-                    leaderBoard.zadd('leaders-craps-basic', item.mapAttr.basic.bankroll, item.userId);
-                  }
-                }
-              }
+          for (subGame in item.mapAttr) {
+            if (item.mapAttr[subGame] && item.mapAttr[subGame].spins
+              && item.mapAttr[subGame].bankroll) {
+              leaderBoard.zadd('leaders-' + game + '-' + subGame, item.mapAttr[subGame].bankroll, item.userId);
             }
-          });
-
-          if (data.LastEvaluatedKey) {
-            return loop(false, data.LastEvaluatedKey);
           }
-        });
+        } else if (game === 'craps') {
+          // For craps, add for basic if they haven't played
+          if (item.mapAttr.basic.rounds || (item.mapAttr.basic.bankroll !== 1000)) {
+            if (item.mapAttr.basic.bankroll) {
+              leaderBoard.zadd('leaders-craps-basic', item.mapAttr.basic.bankroll, item.userId);
+            }
+          }
+        }
+      },
+      (err, results) => {
+        callback(err);
       }
-    })(true, null).then(() => {
-      callback(null);
-    }).catch((err) => {
-      console.log('Error populating ' + game + ' leaderboard: ' + err);
-      callback(err), null;
-    });
+    );
   }
+}
+
+function processDBEntries(dbName, callback, complete) {
+  const results = [];
+
+  // Loop thru to read in all items from the DB
+  (function loop(firstRun, startKey) {
+   const params = {TableName: dbName};
+
+   if (firstRun || startKey) {
+     params.ExclusiveStartKey = startKey;
+     const scanPromise = doc.scan(params).promise();
+     return scanPromise.then((data) => {
+       let i;
+
+       for (i = 0; i < data.Items.length; i++) {
+         if (data.Items[i].mapAttr) {
+           const entry = callback(data.Items[i]);
+           if (entry) {
+             results.push(entry);
+           }
+         }
+       }
+
+       if (data.LastEvaluatedKey) {
+         return loop(false, data.LastEvaluatedKey);
+       }
+     });
+   }
+  })(true, null).then(() => {
+    complete(null, results);
+  }).catch((err) => {
+    console.log(err.stack);
+    complete(err);
+  });
 }
 
 function getAchievementScore(game, attributes) {

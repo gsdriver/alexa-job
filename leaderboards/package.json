@@ -5,6 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "aws-sdk": "^2.28.0",
+    "bluebird": "^3.5.0",
     "redis": "^2.8.0"
   },
   "scripts": {
