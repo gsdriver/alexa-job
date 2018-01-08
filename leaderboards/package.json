@@ -4,9 +4,7 @@
   "description": "Lambda function to refresh the leaderboards",
   "main": "index.js",
   "dependencies": {
-    "aws-sdk": "^2.28.0",
-    "bluebird": "^3.5.0",
-    "redis": "^2.8.0"
+    "request": "^2.83.0"
   },
   "scripts": {
     "start": "node index.js",

@@ -500,6 +500,11 @@ function getSummaryTableRow(firstColumn, secondColumn, formatting) {
   let first = firstColumn;
   let second = secondColumn;
 
+  // If second column is "undefined" make it 0
+  if (second === undefined) {
+    second = 0;
+  }
+
   if (formatting) {
     if (formatting.boldFirstColumn) {
       first = '<b>' + first + '</b>';
