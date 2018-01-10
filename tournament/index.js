@@ -7,7 +7,7 @@
 const request = require('request');
 
 exports.handler = function(event, context, callback) {
-  const now = Date.now();
+  const now = new Date();
 
   // Close the roulette tournament down on Fridays
   // And blackjack on Wednesdays
