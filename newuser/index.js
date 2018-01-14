@@ -85,7 +85,7 @@ function saveNewUsers(callback) {
     const params = {Body: JSON.stringify(details),
       Bucket: 'garrett-alexa-usage',
       Key: 'newusers/' + now + '.txt'};
-    const Item = {userId: 'game', newUsers: '0'};
+    const Item = {userId: 'game', newUsers: 0};
 
     console.log(JSON.stringify(params));
     numCalls = 5;
