@@ -4,7 +4,6 @@ node_modules
 build
 content
 .elasticbeanstalk
-log*.csv
-bounce*.csv
-newusers.csv
+*.csv
 update.bat
+paul.txt
