@@ -7,7 +7,7 @@ AWS.config.update({
 });
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 
-let text = 'First Card,Second Card,Dealer Card,Suggestion,Follow,Deviate,Hit,Stand,Split,Double,Surrender\r\n';
+let text = 'Total,Hard,Pair,First Two,Dealer Card,Suggestion,Follow,Deviate,Hit,Stand,Split,Double,Surrender\r\n';
 
 processDBEntries('Blackjack_Analysis',
   (hand) => {
@@ -17,23 +17,29 @@ processDBEntries('Blackjack_Analysis',
     let total = 0;
     const followed = hand[hand.suggestion] ? hand[hand.suggestion] : 0;
 
-    for (play in hand) {
-      if ((play !== 'cards') && (play !== 'suggestion')) {
-        total += hand[play];
+    // Only process the new format - four entries
+    if (cards.length === 4) {
+      for (play in hand) {
+        if ((play !== 'cards') && (play !== 'suggestion')) {
+          total += hand[play];
+        }
       }
-    }
 
-    line = cards[0] + ',' + cards[1] + ',' + cards[2];
-    line += ',' + hand.suggestion;
-    line += ',' + followed;
-    line += ',' + (total - followed);
-    line += ',' + (hand.hit ? hand.hit : 0);
-    line += ',' + (hand.stand ? hand.stand : 0);
-    line += ',' + (hand.split ? hand.split : 0);
-    line += ',' + (hand.double ? hand.double : 0);
-    line += ',' + (hand.surrender ? hand.surrender : 0);
-    line += '\r\n';
-    text += line;
+      line = cards[0].substring(1) + ',' + (cards[0].substring(0, 1) == 'H' ? 'Hard' : 'Soft');
+      line += ',' + cards[2];
+      line += ',' + cards[1];
+      line += ',' + cards[3];
+      line += ',' + hand.suggestion;
+      line += ',' + followed;
+      line += ',' + (total - followed);
+      line += ',' + (hand.hit ? hand.hit : 0);
+      line += ',' + (hand.stand ? hand.stand : 0);
+      line += ',' + (hand.split ? hand.split : 0);
+      line += ',' + (hand.double ? hand.double : 0);
+      line += ',' + (hand.surrender ? hand.surrender : 0);
+      line += '\r\n';
+      text += line;
+    }
   },
   (err, results) => {
   if (err) {

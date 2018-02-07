@@ -21,44 +21,45 @@ exports.handler = function(event, context, callback) {
         callback();
       } else {
         const game = JSON.parse(data.Body.toString());
-        const firstRound = game.rounds[0];
 
         if (isDefaultRules(game)) {
-          // OK, this isn't a custom set of rules - let's process
-          firstRound.cards.sort((a, b) => (b - a));
-          const key = firstRound.cards[0] + '-' + firstRound.cards[1] + '-' + game.dealerCard;
+          let key;
+          let numCalls = 0;
 
-          // First write the suggestion for this combination
-          doc.update({TableName: 'Blackjack_Analysis',
-              Key: {cards: key},
+          for (let i = 0; i < game.rounds.length; i++) {
+            key = getKeyName(game.rounds[i], (i === 0), game.dealerCard);
+
+            // First write the suggestion for this combination
+            const params = {
+              TableName: 'Blackjack_Analysis',
+              Key: {
+                cards: key,
+              },
               AttributeUpdates: {
                 suggestion: {
                   Action: 'PUT',
-                  Value: firstRound.suggestion,
+                  Value: game.rounds[i].suggestion,
                 },
               },
-            },
-            (err, data) => {
-            if (err) {
-              console.log(err.stack);
-              callback();
-            } else {
-              // Now increment based on what this player did
-              const params = {
-                TableName: 'Blackjack_Analysis',
-                Key: {cards: key},
-              };
+            };
 
-              params.AttributeUpdates = {};
-              params.AttributeUpdates[firstRound.action] = {Action: 'ADD', Value: 1};
-              doc.update(params, (err, data) => {
-                if (err) {
-                  console.log(err);
-                }
+            // And what did the user do?
+            params.AttributeUpdates[game.rounds[i].action] = {
+              Action: 'ADD',
+              Value: 1,
+            };
+
+            numCalls++;
+            doc.update(params, (err, data) => {
+              if (err) {
+                console.log(err);
+              }
+              if (--numCalls === 0) {
+                // All done
                 callback();
-              });
-            }
-          });
+              }
+            });
+          }
         } else {
           // Non-default rules - don't save
           callback();
@@ -106,3 +107,36 @@ function isDefaultRules(game) {
           && (game.rules.numberOfDecks == 1));
   }
 }
+
+function getKeyName(round, firstRound, dealerCard) {
+  let hasAces = false;
+  let total = 0;
+  let soft = false;
+  let key = '';
+
+  for (let i = 0; i < round.cards.length; i++) {
+    total += round.cards[i];
+
+    // Note if there's an ace
+    if (round.cards[i] == 1) {
+      hasAces = true;
+    }
+  }
+
+  // If there are aces, add 10 to the total (unless it would go over 21)
+  // Note that in this case the hand is soft
+  if ((total <= 11) && hasAces) {
+    total += 10;
+    soft = true;
+  }
+
+  // Key name is of form H17-first-nopair-10
+  // Indicating hard 17, first two cards in hand, no pair, dealer 10
+  key += (soft) ? 'S' : 'H';
+  key += total;
+  key += '-' + (firstRound ? 'first' : 'notfirst');
+  key += '-' + (((round.cards.length === 2) && (round.cards[0] === round.cards[1])) ? 'pair' : 'nopair');
+  key += '-' + dealerCard;
+  return key;
+}
+
