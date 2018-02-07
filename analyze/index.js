@@ -29,8 +29,15 @@ exports.handler = function(event, context, callback) {
           const key = firstRound.cards[0] + '-' + firstRound.cards[1] + '-' + game.dealerCard;
 
           // First write the suggestion for this combination
-          doc.put({TableName: 'Blackjack_Analysis',
-            Item: {cards: key, suggestion: firstRound.suggestion}},
+          doc.update({TableName: 'Blackjack_Analysis',
+              Key: {cards: key},
+              AttributeUpdates: {
+                suggestion: {
+                  Action: 'PUT',
+                  Value: firstRound.suggestion,
+                },
+              },
+            },
             (err, data) => {
             if (err) {
               console.log(err.stack);
