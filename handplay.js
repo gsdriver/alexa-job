@@ -17,18 +17,18 @@ processDBEntries('Blackjack_Analysis',
     let total = 0;
     const followed = hand[hand.suggestion] ? hand[hand.suggestion] : 0;
 
-    // Only process the new format - four entries
-    if (cards.length === 4) {
+    // Only process the new format - five entries
+    if (cards.length === 5) {
       for (play in hand) {
         if ((play !== 'cards') && (play !== 'suggestion')) {
           total += hand[play];
         }
       }
 
-      line = cards[0].substring(1) + ',' + (cards[0].substring(0, 1) == 'H' ? 'Hard' : 'Soft');
-      line += ',' + cards[2];
-      line += ',' + cards[1];
+      line = cards[1] + ',' + (cards[0] == 'H' ? 'Hard' : 'Soft');
       line += ',' + cards[3];
+      line += ',' + cards[2];
+      line += ',' + cards[4];
       line += ',' + hand.suggestion;
       line += ',' + followed;
       line += ',' + (total - followed);

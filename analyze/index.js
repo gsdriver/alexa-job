@@ -133,8 +133,9 @@ function getKeyName(round, firstRound, dealerCard) {
   // Key name is of form H17-first-nopair-10
   // Indicating hard 17, first two cards in hand, no pair, dealer 10
   key += (soft) ? 'S' : 'H';
-  key += total;
-  key += '-' + (firstRound ? 'first' : 'notfirst');
+  key += '-' + total;
+  key += '-' + ((firstRound) ? 'initial'
+    : ((round.cards.length === 2) ? 'firsttwo' : 'notfirst'));
   key += '-' + (((round.cards.length === 2) && (round.cards[0] === round.cards[1])) ? 'pair' : 'nopair');
   key += '-' + dealerCard;
   return key;
