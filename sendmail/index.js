@@ -87,8 +87,25 @@ function getBlackjackMail(callback) {
   let recentPlayers = 0;
   let totalPlayers = 0;
 
+  // Recommendations
+  let heardSplit = 0;
+  let heardDouble = 0;
+  let heardSurrender = 0;
+
   processDBEntries('PlayBlackjack',
     (attributes) => {
+      if (attributes.analysis) {
+        if (attributes.analysis.split === 0) {
+          heardSplit++;
+        }
+        if (attributes.analysis.double === 0) {
+          heardDouble++;
+        }
+        if (attributes.analysis.surrender === 0) {
+          heardSurrender++;
+        }
+      }
+
       countAds(attributes, adsPlayed);
       totalPlayers++;
       players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
@@ -115,6 +132,7 @@ function getBlackjackMail(callback) {
         rows.push(getSummaryTableRow('Canadian Players', players['en-CA'] ? players['en-CA'] : 0));
         rows.push(getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));
         rows.push(getSummaryTableRow('Progressive Hands', progressiveHands));
+        rows.push(getSummaryTableRow('Heard Split/Double/Surrender', heardSplit + '/' + heardDouble + '/' + heardSurrender));
 
         text = getSummaryTable('BLACKJACK', rows);
         text += getAdText(adsPlayed);
@@ -132,6 +150,7 @@ function getRouletteMail(callback) {
   let totalPlayers = 0;
   const american = {players: 0, recent: 0};
   const european = {players: 0, recent: 0};
+  let displayDevices = 0;
 
   processDBEntries('RouletteWheel',
     (attributes) => {
@@ -158,6 +177,9 @@ function getRouletteMail(callback) {
           european.recent++;
         }
       }
+      if (attributes.display) {
+        displayDevices++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -171,6 +193,7 @@ function getRouletteMail(callback) {
       rows.push(getSummaryTableRow('Canadian Players', players['en-CA'] ? players['en-CA'] : 0));
       rows.push(getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));
       rows.push(getSummaryTableRow('Australian Players', players['en-AU'] ? players['en-AU'] : 0));
+      rows.push(getSummaryTableRow('Display Devices', displayDevices));
       rows.push(getSummaryTableRow('American Wheel Players', american.players));
       rows.push(getSummaryTableRow('Past 24 Hours', american.recent, {boldSecondColumn: true}));
       rows.push(getSummaryTableRow('European Wheel Players', european.players));
