@@ -12,6 +12,7 @@ AWS.config.update({
 });
 const SES = new AWS.SES();
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
+const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 
 const ONEDAY = 24*60*60*1000;
 
@@ -24,14 +25,26 @@ exports.handler = function(event, context, callback) {
   }
   context.callbackWaitsForEmptyEventLoop = false;
 
-  getMailText((mailBody) => {
+  getMailText((mailBody, summary) => {
     sendEmail(mailBody, (err, data) => {
       if (err) {
         console.log('Error sending mail ' + err.stack);
         callback(err);
       } else {
         console.log('Mail sent!');
-        callback();
+
+        // And write the summary out to S3
+        const today = new Date();
+        today.setDate(today.getDate() - 1);
+        const params = {Body: JSON.stringify(summary),
+          Bucket: 'garrett-alexa-usage',
+          Key: 'dailysummary/' + getFormattedDate(today, '-') + '.txt'};
+        s3.putObject(params, (err, data) => {
+          if (err) {
+            console.log('Error writing to S3 ' + err.stack);
+          }
+          callback();
+        });
       }
     });
   });
@@ -44,68 +57,76 @@ function getMailText(callback) {
   let rouletteText;
   let pokerText;
   let crapsText;
+  const summary = {};
 
-  getBlackjackMail((text) => {
-    bjText = text;
-    completed();
-  });
+  // Before we do anything, we need to read in yesterday's results
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 2);
 
-  getRouletteMail((text) => {
-    rouletteText = text;
-    completed();
-  });
+  s3.getObject({Bucket: 'garrett-alexa-usage',
+      Key: 'dailysummary/' + getFormattedDate(yesterday, '-') + '.txt'},
+      (err, data) => {
+    let lastRun;
 
-  getSlotsMail((text) => {
-    slotText = text;
-    completed();
-  });
-
-  getPokerMail((text) => {
-    pokerText = text;
-    completed();
-  });
-
-  getCrapsMail((text) => {
-    crapsText = text;
-    completed();
-  });
-
-  function completed() {
-    toRun--;
-    if (toRun === 0) {
-      const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + '</HTML>';
-      callback(mailBody);
+    if (data) {
+      const text = data.Body.toString('ascii');
+      lastRun = JSON.parse(text);
+    } else {
+      lastRun = {};
     }
-  }
+
+    getBlackjackMail(lastRun.blackjack, (text, details) => {
+      bjText = text;
+      summary.blackjack = details;
+      completed();
+    });
+
+    getRouletteMail(lastRun.roulette, (text, details) => {
+      rouletteText = text;
+      summary.roulette = details;
+      completed();
+    });
+
+    getSlotsMail(lastRun.slots, (text, details) => {
+      slotText = text;
+      summary.slots = details;
+      completed();
+    });
+
+    getPokerMail(lastRun.poker, (text, details) => {
+      pokerText = text;
+      summary.poker = details;
+      completed();
+    });
+
+    getCrapsMail(lastRun.craps, (text, details) => {
+      crapsText = text;
+      summary.craps = details;
+      completed();
+    });
+
+    function completed() {
+      toRun--;
+      if (toRun === 0) {
+        const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + '</HTML>';
+        callback(mailBody, summary);
+      }
+    }
+  });
 }
 
-function getBlackjackMail(callback) {
+function getBlackjackMail(previousDay, callback) {
   let text;
   const adsPlayed = [];
   const now = Date.now();
   const players = {};
   let recentPlayers = 0;
   let totalPlayers = 0;
-
-  // Recommendations
-  let heardSplit = 0;
-  let heardDouble = 0;
-  let heardSurrender = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
 
   processDBEntries('PlayBlackjack',
     (attributes) => {
-      if (attributes.analysis) {
-        if (attributes.analysis.split === 0) {
-          heardSplit++;
-        }
-        if (attributes.analysis.double === 0) {
-          heardDouble++;
-        }
-        if (attributes.analysis.surrender === 0) {
-          heardSurrender++;
-        }
-      }
-
       countAds(attributes, adsPlayed);
       totalPlayers++;
       players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
@@ -125,24 +146,33 @@ function getBlackjackMail(callback) {
       getBlackjackProgressive('standard', (game, progressiveHands, jackpots) => {
         const rows = [];
 
-        rows.push(getSummaryTableRow('Total Players', totalPlayers));
-        rows.push(getSummaryTableRow('Past 24 Hours', recentPlayers, {boldSecondColumn: true}));
-        rows.push(getSummaryTableRow('American Players', players['en-US']));
-        rows.push(getSummaryTableRow('UK Players', players['en-GB']));
-        rows.push(getSummaryTableRow('Canadian Players', players['en-CA'] ? players['en-CA'] : 0));
-        rows.push(getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));
-        rows.push(getSummaryTableRow('Progressive Hands', progressiveHands));
-        rows.push(getSummaryTableRow('Heard Split/Double/Surrender', heardSplit + '/' + heardDouble + '/' + heardSurrender));
+        // Build up the JSON details
+        details.totalPlayers = totalPlayers;
+        details.recentPlayers = recentPlayers;
+        details.players = players;
+        details.progressiveHands = progressiveHands;
+
+        rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+        rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers), {boldSecondColumn: true}));
+        rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
+          (lastRun.players) ? lastRun.players['en-US'] : undefined)));
+        rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
+          (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
+        rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
+          (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
+        rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
+          (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
+        rows.push(getSummaryTableRow('Progressive Hands', deltaValue(progressiveHands, lastRun.progressiveHands)));
 
         text = getSummaryTable('BLACKJACK', rows);
         text += getAdText(adsPlayed);
-        callback(text);
+        callback(text, details);
       });
     }
   });
 }
 
-function getRouletteMail(callback) {
+function getRouletteMail(previousDay, callback) {
   let text;
   const adsPlayed = [];
   const now = Date.now();
@@ -151,6 +181,8 @@ function getRouletteMail(callback) {
   const american = {players: 0, recent: 0};
   const european = {players: 0, recent: 0};
   let displayDevices = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
 
   processDBEntries('RouletteWheel',
     (attributes) => {
@@ -187,26 +219,42 @@ function getRouletteMail(callback) {
     } else {
       const rows = [];
 
-      rows.push(getSummaryTableRow('Total Players', totalPlayers));
-      rows.push(getSummaryTableRow('American Players', players['en-US']));
-      rows.push(getSummaryTableRow('UK Players', players['en-GB']));
-      rows.push(getSummaryTableRow('Canadian Players', players['en-CA'] ? players['en-CA'] : 0));
-      rows.push(getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));
-      rows.push(getSummaryTableRow('Australian Players', players['en-AU'] ? players['en-AU'] : 0));
-      rows.push(getSummaryTableRow('Display Devices', displayDevices));
-      rows.push(getSummaryTableRow('American Wheel Players', american.players));
-      rows.push(getSummaryTableRow('Past 24 Hours', american.recent, {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('European Wheel Players', european.players));
-      rows.push(getSummaryTableRow('Past 24 Hours', european.recent, {boldSecondColumn: true}));
+      // Save JSON details
+      details.totalPlayers = totalPlayers;
+      details.players = players;
+      details.displayDevices = displayDevices;
+      details.american = american;
+      details.european = european;
+
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
+        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
+      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
+        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
+      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
+        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
+      rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
+        (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
+      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
+      rows.push(getSummaryTableRow('American Wheel Players', deltaValue(american.players,
+        (lastRun.american) ? lastRun.american.players : undefined)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(american.recent,
+        (lastRun.american) ? lastRun.american.recent : undefined),
+        {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('European Wheel Players', deltaValue(european.players,
+        (lastRun.european) ? lastRun.european.players : undefined)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(european.recent,
+        (lastRun.european) ? lastRun.european.recent : undefined),
+        {boldSecondColumn: true}));
 
       text = getSummaryTable('ROULETTE', rows);
       text += getAdText(adsPlayed);
-      callback(text);
+      callback(text, details);
     }
   });
 }
 
-function getSlotsMail(callback) {
+function getSlotsMail(previousDay, callback) {
   let text;
   const adsPlayed = [];
   const now = Date.now();
@@ -215,6 +263,8 @@ function getSlotsMail(callback) {
   let totalPlayers = 0;
   let numGames = 0;
   let game;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
 
   processDBEntries('Slots',
     (attributes) => {
@@ -243,20 +293,38 @@ function getSlotsMail(callback) {
       const rows = [];
       let readGames = 0;
 
-      rows.push(getSummaryTableRow('Total Players', totalPlayers));
-      rows.push(getSummaryTableRow('American Players', players['en-US']));
-      rows.push(getSummaryTableRow('UK Players', players['en-GB']));
-      rows.push(getSummaryTableRow('Canadian Players', players['en-CA'] ? players['en-CA'] : 0));
-      rows.push(getSummaryTableRow('Indian Players', players['en-IN'] ? players['en-IN'] : 0));
-      rows.push(getSummaryTableRow('Australian Players', players['en-AU'] ? players['en-AU'] : 0));
+      // Build up the details
+      details.totalPlayers = totalPlayers;
+      details.players = players;
+      details.games = {};
+
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+
+      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
+        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
+      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
+        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
+      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
+        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
+      rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
+        (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
+      rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
+        (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
 
       for (game in games) {
         if (game) {
           getSlotsProgressive(game, (game, coins) => {
-            rows.push(getSummaryTableRow('Total ' + game + ' Players', games[game].players));
-            rows.push(getSummaryTableRow('Past 24 Hours', games[game].recent, {boldSecondColumn: true}));
+            details.games[game] = games[game];
+
+            rows.push(getSummaryTableRow('Total ' + game + ' Players', deltaValue(games[game].players,
+              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].players : undefined)));
+            rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(games[game].recent,
+              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].recent : undefined),
+              {boldSecondColumn: true}));
             if (coins && (coins > 0)) {
-              rows.push(getSummaryTableRow('Progressive Coins', coins));
+              details.games[game].coins = coins;
+              rows.push(getSummaryTableRow('Progressive Coins', deltaValue(coins,
+                (lastRun.games && lastRun.games[game]) ? lastRun.games[game].coins : undefined)));
             }
 
             // Are we done?
@@ -264,7 +332,7 @@ function getSlotsMail(callback) {
             if (readGames === numGames) {
               text = getSummaryTable('SLOT MACHINE', rows);
               text += getAdText(adsPlayed);
-              callback(text);
+              callback(text, details);
             }
           });
         }
@@ -273,7 +341,7 @@ function getSlotsMail(callback) {
   });
 }
 
-function getPokerMail(callback) {
+function getPokerMail(previousDay, callback) {
   let text;
   const adsPlayed = [];
   const now = Date.now();
@@ -281,6 +349,8 @@ function getPokerMail(callback) {
   let totalPlayers = 0;
   let numGames = 0;
   let game;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
 
   processDBEntries('VideoPoker',
     (attributes) => {
@@ -308,14 +378,25 @@ function getPokerMail(callback) {
       const rows = [];
       let readGames = 0;
 
-      rows.push(getSummaryTableRow('Total Players', totalPlayers));
+      // Build JSON details
+      details.totalPlayers = totalPlayers;
+      details.games = {};
+
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
       for (game in games) {
         if (game) {
           getPokerProgressive(game, (game, coins) => {
-            rows.push(getSummaryTableRow('Total ' + game + ' Players', games[game].players));
-            rows.push(getSummaryTableRow('Past 24 Hours', games[game].recent, {boldSecondColumn: true}));
+            details.games[game] = games[game];
+
+            rows.push(getSummaryTableRow('Total ' + game + ' Players', deltaValue(games[game].players,
+              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].players : undefined)));
+            rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(games[game].recent,
+              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].recent : undefined),
+              {boldSecondColumn: true}));
             if (coins && (coins > 0)) {
-              rows.push(getSummaryTableRow('Progressive Coins', coins));
+              details.games[game].coins = coins;
+              rows.push(getSummaryTableRow('Progressive Coins', deltaValue(coins,
+                (lastRun.games && lastRun.games[game]) ? lastRun.games[game].coins : undefined)));
             }
 
             // Are we done?
@@ -323,7 +404,7 @@ function getPokerMail(callback) {
             if (readGames === numGames) {
               text = getSummaryTable('VIDEO POKER', rows);
               text += getAdText(adsPlayed);
-              callback(text);
+              callback(text, details);
             }
           });
         }
@@ -332,13 +413,15 @@ function getPokerMail(callback) {
   });
 }
 
-function getCrapsMail(callback) {
+function getCrapsMail(previousDay, callback) {
   let text;
   const adsPlayed = [];
   const now = Date.now();
   let totalPlayers = 0;
   let recent = 0;
   let rounds = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
 
   processDBEntries('Craps',
     (attributes) => {
@@ -356,13 +439,18 @@ function getCrapsMail(callback) {
     if (err) {
       callback('Error getting slots data: ' + err);
     } else {
+      // Build JSON details
+      details.totalPlayers = totalPlayers;
+      details.recent = recent;
+      details.rounds = rounds;
+
       const rows = [];
-      rows.push(getSummaryTableRow('Total Players', totalPlayers));
-      rows.push(getSummaryTableRow('Past 24 Hours', recent, {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('Rounds Played', rounds));
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
       text = getSummaryTable('CRAPS', rows);
       text += getAdText(adsPlayed);
-      callback(text);
+      callback(text, details);
     }
   });
 }
@@ -476,12 +564,9 @@ function countAds(attributes, adsPlayed) {
 }
 
 function sendEmail(text, callback) {
-  const d = new Date();
-  d.setHours(d.getHours() - 8);
-
-  const digestName = (d.getHours() < 12)
-          ? 'Alexa Skill Usage Morning Digest'
-          : 'Alexa Skill Usage Evening Digest';
+  const today = new Date();
+  today.setDate(today.getDate() - 1);
+  const digestName = 'Alexa Skill Usage Digest for ' + getFormattedDate(today);
 
   const params = {
     Destination: {
@@ -560,4 +645,29 @@ function getAdText(adsPlayed) {
   htmlText += tableEnd;
 
   return htmlText;
+}
+
+function getFormattedDate(date, hypen) {
+  const year = date.getFullYear();
+  const month = (1 + date.getMonth()).toString();
+  const day = date.getDate().toString();
+  const separator = (hypen) ? hypen : '/';
+
+  return month + separator + day + separator + year;
+}
+
+function deltaValue(value, oldvalue) {
+  if (oldvalue === undefined) {
+    return value;
+  }
+
+  const delta = value - oldvalue;
+
+  if (delta == 0) {
+    return value + ' (unchanged)';
+  } else if (delta < 0) {
+    return value + ' (<font color=red>down ' + (-delta) + '</font>)';
+  } else {
+    return value + ' (<font color=green>up ' + delta + '</font>)';
+  }
 }
