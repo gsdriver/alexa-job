@@ -656,7 +656,8 @@ function getFormattedDate(date, hypen) {
   return month + separator + day + separator + year;
 }
 
-function deltaValue(value, oldvalue) {
+function deltaValue(newvalue, oldvalue) {
+  const value = (newvalue === undefined) ? 0 : newvalue;
   if (oldvalue === undefined) {
     return value;
   }
