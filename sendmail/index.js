@@ -124,6 +124,7 @@ function getBlackjackMail(previousDay, callback) {
   let totalPlayers = 0;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
+  let trainingPlayers = 0;
 
   processDBEntries('PlayBlackjack',
     (attributes) => {
@@ -136,6 +137,11 @@ function getBlackjackMail(previousDay, callback) {
       } else if (attributes.tournament && attributes.tournament.timestamp
         && (now - attributes.tournament.timestamp < ONEDAY)) {
         recentPlayers++;
+      }
+      if (attributes.standard && attributes.standard.training) {
+        trainingPlayers++;
+      } else if (attributes.tournament && attributes.tournament.training) {
+        trainingPlayers++;
       }
     },
     (err, results) => {
@@ -150,6 +156,7 @@ function getBlackjackMail(previousDay, callback) {
         details.totalPlayers = totalPlayers;
         details.recentPlayers = recentPlayers;
         details.players = players;
+        details.trainingPlayers = trainingPlayers;
         details.progressiveHands = progressiveHands;
 
         rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
@@ -162,6 +169,9 @@ function getBlackjackMail(previousDay, callback) {
           (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
         rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
           (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
+        rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
+          (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+        rows.push(getSummaryTableRow('Training Players', deltaValue(trainingPlayers, lastRun.trainingPlayers)));
         rows.push(getSummaryTableRow('Progressive Hands', deltaValue(progressiveHands, lastRun.progressiveHands)));
 
         text = getSummaryTable('BLACKJACK', rows);
