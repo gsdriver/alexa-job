@@ -358,6 +358,7 @@ function getPokerMail(previousDay, callback) {
   const games = {};
   let totalPlayers = 0;
   let numGames = 0;
+  let displayDevices = 0;
   let game;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
@@ -380,6 +381,9 @@ function getPokerMail(previousDay, callback) {
           }
         }
       }
+      if (attributes.display) {
+        displayDevices++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -390,6 +394,7 @@ function getPokerMail(previousDay, callback) {
 
       // Build JSON details
       details.totalPlayers = totalPlayers;
+      details.displayDevices = displayDevices;
       details.games = {};
 
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
@@ -412,6 +417,7 @@ function getPokerMail(previousDay, callback) {
             // Are we done?
             readGames++;
             if (readGames === numGames) {
+              rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
               text = getSummaryTable('VIDEO POKER', rows);
               text += getAdText(adsPlayed);
               callback(text, details);
