@@ -1,16 +1,21 @@
 'use strict';
 
+const fs = require('fs');
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 
 let numPrompts = 0;
 let numCalls = 1;
+const suggestions = [];
 
 processDBEntries('PlayBlackjack',
   (attributes) => {
     if (attributes.prompts) {
       numPrompts++;
+    }
+    if (attributes.tookSuggestion) {
+      suggestions.push(attributes.tookSuggestion);
     }
   },
   (err, results) => {
@@ -21,6 +26,24 @@ processDBEntries('PlayBlackjack',
 
 function completed() {
   console.log(numPrompts + ' blackjack players were prompted');
+
+  const csvFile = 'tookSuggestion.csv';
+  let text = '';
+
+  suggestions.forEach((suggestion) => {
+    text += (suggestion.yes ? suggestion.yes : 0) + ',' + (suggestion.no ? suggestion.no : 0) + '\n';
+  });
+
+  // Delete the csv file if it exists
+  if (fs.existsSync(csvFile)) {
+    fs.unlinkSync(csvFile);
+  }
+
+  fs.writeFile(csvFile, text, (err) => {
+    if (err) {
+      console.log(err);
+    }
+  });
 }
 
 function processDBEntries(dbName, callback, complete) {
