@@ -273,6 +273,7 @@ function getSlotsMail(previousDay, callback) {
   let totalPlayers = 0;
   let numGames = 0;
   let game;
+  let displayDevices = 0;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
 
@@ -295,6 +296,9 @@ function getSlotsMail(previousDay, callback) {
           }
         }
       }
+      if (attributes.display) {
+        displayDevices++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -305,6 +309,7 @@ function getSlotsMail(previousDay, callback) {
 
       // Build up the details
       details.totalPlayers = totalPlayers;
+      details.displayDevices = displayDevices;
       details.players = players;
       details.games = {};
 
@@ -340,6 +345,7 @@ function getSlotsMail(previousDay, callback) {
             // Are we done?
             readGames++;
             if (readGames === numGames) {
+              rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
               text = getSummaryTable('SLOT MACHINE', rows);
               text += getAdText(adsPlayed);
               callback(text, details);
