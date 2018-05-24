@@ -51,12 +51,13 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 5;
+  let toRun = 6;
   let bjText;
   let slotText;
   let rouletteText;
   let pokerText;
   let crapsText;
+  let warText;
   const summary = {};
 
   // Before we do anything, we need to read in yesterday's results
@@ -105,10 +106,16 @@ function getMailText(callback) {
       completed();
     });
 
+    getWarMail(lastRun.war, (text, details) => {
+      warText = text;
+      summary.war = details;
+      completed();
+    });
+
     function completed() {
       toRun--;
       if (toRun === 0) {
-        const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + '</HTML>';
+        const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + warText + '</HTML>';
         callback(mailBody, summary);
       }
     }
@@ -471,6 +478,48 @@ function getCrapsMail(previousDay, callback) {
       rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
       rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
       text = getSummaryTable('CRAPS', rows);
+      text += getAdText(adsPlayed);
+      callback(text, details);
+    }
+  });
+}
+
+function getWarMail(previousDay, callback) {
+  let text;
+  const adsPlayed = [];
+  const now = Date.now();
+  let totalPlayers = 0;
+  let recent = 0;
+  let rounds = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
+
+  processDBEntries('War',
+    (attributes) => {
+      countAds(attributes, adsPlayed);
+      totalPlayers++;
+      if (attributes.basic && attributes.basic.timestamp &&
+        (now - attributes.basic.timestamp < ONEDAY)) {
+        recent++;
+      }
+      if (attributes.basic && attributes.basic.rounds) {
+        rounds += attributes.basic.rounds;
+      }
+    },
+    (err, results) => {
+    if (err) {
+      callback('Error getting war data: ' + err);
+    } else {
+      // Build JSON details
+      details.totalPlayers = totalPlayers;
+      details.recent = recent;
+      details.rounds = rounds;
+
+      const rows = [];
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
+      text = getSummaryTable('WAR', rows);
       text += getAdText(adsPlayed);
       callback(text, details);
     }
