@@ -53,7 +53,7 @@ readFiles(contentDir, (err, results) => {
     console.log(err);
   } else {
     // Now go through each result and write to a CSV file
-    let text = 'Date,Roulette,Blackjack,Slots,Poker,Craps\n';
+    let text = 'Date,Roulette,Blackjack,Slots,Poker,Craps,War\n';
 
     results.sort((a, b) => (a.timestamp - b.timestamp));
     results.forEach((result) => {
@@ -65,6 +65,9 @@ readFiles(contentDir, (err, results) => {
       }
       if (result.craps !== undefined) {
         text += ',' + result.craps;
+      }
+      if (result.war !== undefined) {
+        text += ',' + result.war;
       }
       text += '\n';
     });

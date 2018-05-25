@@ -26,8 +26,8 @@ exports.handler = function(event, context, callback) {
 
 function saveNewUsers(callback) {
   const now = Date.now();
-  const details = {roulette: 0, blackjack: 0, slots: 0, poker: 0, craps: 0, timestamp: now};
-  let numCalls = 5;
+  const details = {roulette: 0, blackjack: 0, slots: 0, poker: 0, craps: 0, war: 0, timestamp: now};
+  let numCalls = 6;
 
   // Read from the databases
   doc.get({TableName: 'RouletteWheel', Key: {userId: 'game'}},
@@ -80,6 +80,16 @@ function saveNewUsers(callback) {
     }
   });
 
+  doc.get({TableName: 'War', Key: {userId: 'game'}},
+          (err, data) => {
+    if (data && data.Item && data.Item.newUsers) {
+      details.war = parseInt(data.Item.newUsers);
+    }
+    if (--numCalls === 0) {
+      completed();
+    }
+  });
+
   function completed() {
     // Now write to S3
     const params = {Body: JSON.stringify(details),
@@ -120,6 +130,13 @@ function saveNewUsers(callback) {
         }
       });
       doc.put({TableName: 'Craps',
+                    Item: Item},
+                    (err, data) => {
+        if (--numCalls === 0) {
+          callback();
+        }
+      });
+      doc.put({TableName: 'War',
                     Item: Item},
                     (err, data) => {
         if (--numCalls === 0) {
