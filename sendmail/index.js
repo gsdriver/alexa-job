@@ -132,6 +132,7 @@ function getBlackjackMail(previousDay, callback) {
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
   let trainingPlayers = 0;
+  let displayDevices = 0;
 
   processDBEntries('PlayBlackjack',
     (attributes) => {
@@ -150,6 +151,9 @@ function getBlackjackMail(previousDay, callback) {
       } else if (attributes.tournament && attributes.tournament.training) {
         trainingPlayers++;
       }
+      if (attributes.display) {
+        displayDevices++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -165,6 +169,7 @@ function getBlackjackMail(previousDay, callback) {
         details.players = players;
         details.trainingPlayers = trainingPlayers;
         details.progressiveHands = progressiveHands;
+        details.displayDevices = displayDevices;
 
         rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
         rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers), {boldSecondColumn: true}));
@@ -178,6 +183,7 @@ function getBlackjackMail(previousDay, callback) {
           (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
         rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
           (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+        rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
         rows.push(getSummaryTableRow('Training Players', deltaValue(trainingPlayers, lastRun.trainingPlayers)));
         rows.push(getSummaryTableRow('Progressive Hands', deltaValue(progressiveHands, lastRun.progressiveHands)));
 
@@ -451,6 +457,7 @@ function getCrapsMail(previousDay, callback) {
   let rounds = 0;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
+  let displayDevices = 0;
 
   processDBEntries('Craps',
     (attributes) => {
@@ -463,6 +470,9 @@ function getCrapsMail(previousDay, callback) {
       if (attributes.basic && attributes.basic.rounds) {
         rounds += attributes.basic.rounds;
       }
+      if (attributes.display) {
+        displayDevices++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -470,6 +480,7 @@ function getCrapsMail(previousDay, callback) {
     } else {
       // Build JSON details
       details.totalPlayers = totalPlayers;
+      details.displayDevices = displayDevices;
       details.recent = recent;
       details.rounds = rounds;
 
@@ -477,6 +488,7 @@ function getCrapsMail(previousDay, callback) {
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
       rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
       rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
+      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
       text = getSummaryTable('CRAPS', rows);
       text += getAdText(adsPlayed);
       callback(text, details);
@@ -493,6 +505,7 @@ function getWarMail(previousDay, callback) {
   let rounds = 0;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
+  let displayDevices = 0;
 
   processDBEntries('War',
     (attributes) => {
@@ -505,6 +518,9 @@ function getWarMail(previousDay, callback) {
       if (attributes.basic && attributes.basic.rounds) {
         rounds += attributes.basic.rounds;
       }
+      if (attributes.display) {
+        displayDevices++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -512,6 +528,7 @@ function getWarMail(previousDay, callback) {
     } else {
       // Build JSON details
       details.totalPlayers = totalPlayers;
+      details.displayDevices = displayDevices;
       details.recent = recent;
       details.rounds = rounds;
 
@@ -519,6 +536,7 @@ function getWarMail(previousDay, callback) {
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
       rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
       rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
+      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
       text = getSummaryTable('WAR', rows);
       text += getAdText(adsPlayed);
       callback(text, details);

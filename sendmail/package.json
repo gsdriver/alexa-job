@@ -4,7 +4,7 @@
   "description": "Lambda function to send mail",
   "main": "index.js",
   "dependencies": {
-    "aws-sdk": "^2.28.0",
+    "aws-sdk": "^2.246.1",
     "bluebird": "^3.5.0"
   },
   "scripts": {
