@@ -284,8 +284,10 @@ function getSlotsMail(previousDay, callback) {
   const players = {};
   const games = {};
   let totalPlayers = 0;
+  let recentPlayers = 0;
   let numGames = 0;
   let game;
+  let isRecent;
   let displayDevices = 0;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
@@ -294,6 +296,7 @@ function getSlotsMail(previousDay, callback) {
     (attributes) => {
       countAds(attributes, adsPlayed);
       totalPlayers++;
+      isRecent = false;
       players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
       for (game in attributes) {
         if (game && (attributes[game].spins)) {
@@ -306,11 +309,15 @@ function getSlotsMail(previousDay, callback) {
           if (attributes[game].timestamp &&
             (now - attributes[game].timestamp < ONEDAY)) {
             games[game].recent = (games[game].recent + 1) || 1;
+            isRecent = true;
           }
         }
       }
       if (attributes.display) {
         displayDevices++;
+      }
+      if (isRecent) {
+        recentPlayers++;
       }
     },
     (err, results) => {
@@ -324,9 +331,11 @@ function getSlotsMail(previousDay, callback) {
       details.totalPlayers = totalPlayers;
       details.displayDevices = displayDevices;
       details.players = players;
+      details.recentPlayers = recentPlayers;
       details.games = {};
 
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers)));
 
       rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
         (lastRun.players) ? lastRun.players['en-US'] : undefined)));

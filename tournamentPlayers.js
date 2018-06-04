@@ -1,27 +1,55 @@
 'use strict';
 
+const fs = require('fs');
 const AWS = require('aws-sdk');
 AWS.config.update({
   region: 'us-east-1',
 });
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
-const players = [];
 
-processDBEntries('Slots',
-  (item) => {
-    const attributes = item.mapAttr;
-
-    if (attributes && attributes.tournamentsPlayed) {
-      players.push({user: item.userId, times: attributes.tournamentsPlayed});
-    }
-  },
-  (err, results) => {
-  if (err) {
-    callback('Error processing data: ' + err);
-  } else {
-    console.log(JSON.stringify(players));
-  }
+const csvFile = 'tournamentPlayers.csv';
+let text = 'Game,User,Tournaments Played\n';
+getPlayers('Slots', (slotPlayers) => {
+  getPlayers('PlayBlackjack', (blackjackPlayers) => {
+    getPlayers('RouletteWheel', (roulettePlayers) => {
+      slotPlayers.forEach((player) => {
+        text += ('Slots,' + player.user + ',' + player.times + '\n');
+      });
+      blackjackPlayers.forEach((player) => {
+        text += ('Blackjack,' + player.user + ',' + player.times + '\n');
+      });
+      roulettePlayers.forEach((player) => {
+        text += ('Roulette,' + player.user + ',' + player.times + '\n');
+      });
+      if (fs.existsSync(csvFile)) {
+        fs.unlinkSync(csvFile);
+      }
+      fs.writeFile(csvFile, text, (err) => {
+        console.log('Done');
+      });
+    });
+  });
 });
+
+function getPlayers(dbName, callback) {
+  const players = [];
+
+  processDBEntries(dbName,
+    (item) => {
+      const attributes = item.mapAttr;
+
+      if (attributes && attributes.tournamentsPlayed) {
+        players.push({user: item.userId, times: attributes.tournamentsPlayed});
+      }
+    },
+    (err, results) => {
+    if (err) {
+      callback('Error processing data: ' + err);
+    } else {
+      callback(players);
+    }
+  });
+}
 
 function processDBEntries(dbName, callback, complete) {
   const results = [];
