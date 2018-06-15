@@ -51,13 +51,14 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 6;
+  let toRun = 7;
   let bjText;
   let slotText;
   let rouletteText;
   let pokerText;
   let crapsText;
   let warText;
+  let baccaratText;
   const summary = {};
 
   // Before we do anything, we need to read in yesterday's results
@@ -112,10 +113,16 @@ function getMailText(callback) {
       completed();
     });
 
+    getBaccaratMail(lastRun.baccarat, (text, details) => {
+      baccaratText = text;
+      summary.baccarat = details;
+      completed();
+    });
+
     function completed() {
       toRun--;
       if (toRun === 0) {
-        const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + warText + '</HTML>';
+        const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + warText + baccaratText + '</HTML>';
         callback(mailBody, summary);
       }
     }
@@ -335,7 +342,8 @@ function getSlotsMail(previousDay, callback) {
       details.games = {};
 
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers),
+        {boldSecondColumn: true}));
 
       rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
         (lastRun.players) ? lastRun.players['en-US'] : undefined)));
@@ -547,6 +555,60 @@ function getWarMail(previousDay, callback) {
       rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
       rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
       text = getSummaryTable('WAR', rows);
+      text += getAdText(adsPlayed);
+      callback(text, details);
+    }
+  });
+}
+
+function getBaccaratMail(previousDay, callback) {
+  let text;
+  const adsPlayed = [];
+  const now = Date.now();
+  let totalPlayers = 0;
+  let recent = 0;
+  let rounds = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
+  let displayDevices = 0;
+  let maxMartini = 0;
+
+  processDBEntries('Baccarat',
+    (attributes) => {
+      countAds(attributes, adsPlayed);
+      totalPlayers++;
+      if (attributes.basic && attributes.basic.timestamp &&
+        (now - attributes.basic.timestamp < ONEDAY)) {
+        recent++;
+      }
+      if (attributes.basic && attributes.basic.rounds) {
+        rounds += attributes.basic.rounds;
+      }
+      if (attributes.maxMartini && (attributes.maxMartini > maxMartini)) {
+        maxMartini = attributes.maxMartini;
+      }
+      if (attributes.display) {
+        displayDevices++;
+      }
+    },
+    (err, results) => {
+    if (err) {
+      callback('Error getting baccarat data: ' + err);
+    } else {
+      // Build JSON details
+      details.totalPlayers = totalPlayers;
+      details.displayDevices = displayDevices;
+      details.recent = recent;
+      details.rounds = rounds;
+      details.maxMartini = maxMartini;
+
+      const rows = [];
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
+      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
+      rows.push(getSummaryTableRow('Biggest Drinker', deltaValue(maxMartini, lastRun.maxMartini)));
+      text = getSummaryTable('BACCARAT', rows);
       text += getAdText(adsPlayed);
       callback(text, details);
     }

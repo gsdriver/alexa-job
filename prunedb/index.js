@@ -38,7 +38,7 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 6;
+  let toRun = 7;
   const summary = {};
 
   pruneRecords('PlayBlackjack', summary, (err) => {
@@ -57,6 +57,9 @@ function getMailText(callback) {
     completed();
   });
   pruneRecords('War', summary, (err) => {
+    completed();
+  });
+  pruneRecords('Baccarat', summary, (err) => {
     completed();
   });
 

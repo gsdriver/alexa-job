@@ -26,69 +26,36 @@ exports.handler = function(event, context, callback) {
 
 function saveNewUsers(callback) {
   const now = Date.now();
-  const details = {roulette: 0, blackjack: 0, slots: 0, poker: 0, craps: 0, war: 0, timestamp: now};
-  let numCalls = 6;
+  const details = {timestamp: now};
+  let numCalls = 0;
+  const dbs = {
+    roulette: 'RouletteWheel',
+    blackjack: 'PlayBlackjack',
+    slots: 'Slots',
+    poker: 'VideoPoker',
+    craps: 'Craps',
+    war: 'War',
+    baccarat: 'Baccarat',
+  };
 
-  // Read from the databases
-  doc.get({TableName: 'RouletteWheel', Key: {userId: 'game'}},
-          (err, data) => {
-    if (data && data.Item && data.Item.newUsers) {
-      details.roulette = parseInt(data.Item.newUsers);
+  let db;
+  for (db in dbs) {
+    if (dbs[db]) {
+      // Read from the databases
+      numCalls++;
+      doc.get({TableName: dbs[db], Key: {userId: 'game'}},
+              (err, data) => {
+        if (data && data.Item && data.Item.newUsers) {
+          details[db] = parseInt(data.Item.newUsers);
+        } else {
+          details[db] = 0;
+        }
+        if (--numCalls === 0) {
+          completed();
+        }
+      });
     }
-    if (--numCalls === 0) {
-      completed();
-    }
-  });
-
-  doc.get({TableName: 'PlayBlackjack', Key: {userId: 'game'}},
-          (err, data) => {
-    if (data && data.Item && data.Item.newUsers) {
-      details.blackjack = parseInt(data.Item.newUsers);
-    }
-    if (--numCalls === 0) {
-      completed();
-    }
-  });
-
-  doc.get({TableName: 'Slots', Key: {userId: 'game'}},
-          (err, data) => {
-    if (data && data.Item && data.Item.newUsers) {
-      details.slots = parseInt(data.Item.newUsers);
-    }
-    if (--numCalls === 0) {
-      completed();
-    }
-  });
-
-  doc.get({TableName: 'VideoPoker', Key: {userId: 'game'}},
-          (err, data) => {
-    if (data && data.Item && data.Item.newUsers) {
-      details.poker = parseInt(data.Item.newUsers);
-    }
-    if (--numCalls === 0) {
-      completed();
-    }
-  });
-
-  doc.get({TableName: 'Craps', Key: {userId: 'game'}},
-          (err, data) => {
-    if (data && data.Item && data.Item.newUsers) {
-      details.craps = parseInt(data.Item.newUsers);
-    }
-    if (--numCalls === 0) {
-      completed();
-    }
-  });
-
-  doc.get({TableName: 'War', Key: {userId: 'game'}},
-          (err, data) => {
-    if (data && data.Item && data.Item.newUsers) {
-      details.war = parseInt(data.Item.newUsers);
-    }
-    if (--numCalls === 0) {
-      completed();
-    }
-  });
+  }
 
   function completed() {
     // Now write to S3
@@ -98,51 +65,21 @@ function saveNewUsers(callback) {
     const Item = {userId: 'game', newUsers: 0};
 
     console.log(JSON.stringify(params));
-    numCalls = 5;
+    numCalls = 0;
     s3.putObject(params, (err, data) => {
       // And reset the DBs
-      doc.put({TableName: 'RouletteWheel',
-                    Item: Item},
-                    (err, data) => {
-        if (--numCalls === 0) {
-          callback();
+      for (db in dbs) {
+        if (dbs[db]) {
+          numCalls++;
+          doc.put({TableName: dbs[db],
+                        Item: Item},
+                        (err, data) => {
+            if (--numCalls === 0) {
+              callback();
+            }
+          });
         }
-      });
-      doc.put({TableName: 'PlayBlackjack',
-                    Item: Item},
-                    (err, data) => {
-        if (--numCalls === 0) {
-          callback();
-        }
-      });
-      doc.put({TableName: 'Slots',
-                    Item: Item},
-                    (err, data) => {
-        if (--numCalls === 0) {
-          callback();
-        }
-      });
-      doc.put({TableName: 'VideoPoker',
-                    Item: Item},
-                    (err, data) => {
-        if (--numCalls === 0) {
-          callback();
-        }
-      });
-      doc.put({TableName: 'Craps',
-                    Item: Item},
-                    (err, data) => {
-        if (--numCalls === 0) {
-          callback();
-        }
-      });
-      doc.put({TableName: 'War',
-                    Item: Item},
-                    (err, data) => {
-        if (--numCalls === 0) {
-          callback();
-        }
-      });
+      }
     });
   }
 }
