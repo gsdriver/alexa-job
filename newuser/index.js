@@ -41,11 +41,18 @@ function saveNewUsers(callback) {
   let db;
   for (db in dbs) {
     if (dbs[db]) {
-      // Read from the databases
       numCalls++;
+    }
+  }
+  for (db in dbs) {
+    if (dbs[db]) {
+      // Read from the databases
       doc.get({TableName: dbs[db], Key: {userId: 'game'}},
               (err, data) => {
-        if (data && data.Item && data.Item.newUsers) {
+        if (err) {
+          console.log(err);
+          details[db] = err.description;
+        } else if (data && data.Item && data.Item.newUsers) {
           details[db] = parseInt(data.Item.newUsers);
         } else {
           details[db] = 0;
