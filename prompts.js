@@ -5,14 +5,17 @@ const AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 
-let numPrompts = 0;
+const prompts = {};
 let numCalls = 1;
 const suggestions = [];
 
 processDBEntries('PlayBlackjack',
   (attributes) => {
     if (attributes.prompts) {
-      numPrompts++;
+      let prompt;
+      for (prompt in attributes.prompts) {
+        prompts[prompt] = (prompts[prompt] + 1) || 1;
+      }
     }
     if (attributes.tookSuggestion) {
       suggestions.push(attributes.tookSuggestion);
@@ -25,7 +28,7 @@ processDBEntries('PlayBlackjack',
 });
 
 function completed() {
-  console.log(numPrompts + ' blackjack players were prompted');
+  console.log('Blackjack prompts: ' + JSON.stringify(prompts));
 
   const csvFile = 'tookSuggestion.csv';
   let text = '';
