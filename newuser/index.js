@@ -41,26 +41,23 @@ function saveNewUsers(callback) {
   let db;
   for (db in dbs) {
     if (dbs[db]) {
-      numCalls++;
-    }
-  }
-  for (db in dbs) {
-    if (dbs[db]) {
       // Read from the databases
+      numCalls++;
       doc.get({TableName: dbs[db], Key: {userId: 'game'}},
-              (err, data) => {
-        if (err) {
-          console.log(err);
-          details[db] = err.description;
-        } else if (data && data.Item && data.Item.newUsers) {
-          details[db] = parseInt(data.Item.newUsers);
-        } else {
-          details[db] = 0;
-        }
-        if (--numCalls === 0) {
-          completed();
-        }
-      });
+        function(err, data) {
+          if (err) {
+            console.log(err);
+            details[this.db] = err.description;
+          } else if (data && data.Item && data.Item.newUsers) {
+            details[this.db] = parseInt(data.Item.newUsers);
+          } else {
+            details[this.db] = 0;
+          }
+          if (--numCalls === 0) {
+            completed();
+          }
+        }.bind({db: db})
+      );
     }
   }
 

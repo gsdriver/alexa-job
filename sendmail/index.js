@@ -15,6 +15,7 @@ const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 
 const ONEDAY = 24*60*60*1000;
+const ONEMONTH = 30*24*60*60*1000;
 
 exports.handler = function(event, context, callback) {
   // Note if this is triggered by an s3 upload
@@ -135,10 +136,12 @@ function getBlackjackMail(previousDay, callback) {
   const now = Date.now();
   const players = {};
   let recentPlayers = 0;
+  let lastMonthPlayers = 0;
   let totalPlayers = 0;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
   let trainingPlayers = 0;
+  let spanishPlayers = 0;
   let displayDevices = 0;
 
   processDBEntries('PlayBlackjack',
@@ -146,13 +149,30 @@ function getBlackjackMail(previousDay, callback) {
       countAds(attributes, adsPlayed);
       totalPlayers++;
       players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
-      if (attributes.standard && attributes.standard.timestamp
-        && (now - attributes.standard.timestamp < ONEDAY)) {
-        recentPlayers++;
-      } else if (attributes.tournament && attributes.tournament.timestamp
-        && (now - attributes.tournament.timestamp < ONEDAY)) {
+      let game;
+      let playedLastDay = false;
+      let playedLastMonth = false;
+      for (game in attributes) {
+        if (attributes[game] && attributes[game].timestamp) {
+          if (now - attributes[game].timestamp < ONEDAY) {
+            playedLastDay = true;
+          }
+          if (now - attributes[game].timestamp < ONEMONTH) {
+            playedLastMonth = true;
+          }
+        }
+      }
+
+      if (attributes.spanish) {
+        spanishPlayers++;
+      }
+      if (playedLastDay) {
         recentPlayers++;
       }
+      if (playedLastMonth) {
+        lastMonthPlayers++;
+      }
+
       if (attributes.standard && attributes.standard.training) {
         trainingPlayers++;
       } else if (attributes.tournament && attributes.tournament.training) {
@@ -173,6 +193,8 @@ function getBlackjackMail(previousDay, callback) {
         // Build up the JSON details
         details.totalPlayers = totalPlayers;
         details.recentPlayers = recentPlayers;
+        details.lastMonthPlayers = lastMonthPlayers;
+        details.spanishPlayers = spanishPlayers;
         details.players = players;
         details.trainingPlayers = trainingPlayers;
         details.progressiveHands = progressiveHands;
@@ -180,6 +202,7 @@ function getBlackjackMail(previousDay, callback) {
 
         rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
         rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers), {boldSecondColumn: true}));
+        rows.push(getSummaryTableRow('Past 30 Days', deltaValue(lastMonthPlayers, lastRun.lastMonthPlayers), {boldSecondColumn: true}));
         rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
           (lastRun.players) ? lastRun.players['en-US'] : undefined)));
         rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
@@ -190,6 +213,7 @@ function getBlackjackMail(previousDay, callback) {
           (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
         rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
           (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+        rows.push(getSummaryTableRow('Spanish Players', deltaValue(spanishPlayers, lastRun.spanishPlayers)));
         rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
         rows.push(getSummaryTableRow('Training Players', deltaValue(trainingPlayers, lastRun.trainingPlayers)));
         rows.push(getSummaryTableRow('Progressive Hands', deltaValue(progressiveHands, lastRun.progressiveHands)));
