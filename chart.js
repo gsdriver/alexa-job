@@ -69,7 +69,7 @@ readFiles(contentDir, (err, results) => {
       if (result.war !== undefined) {
         text += ',' + result.war;
       }
-      if (results.baccarat !== undefined) {
+      if (result.baccarat !== undefined) {
         text += ',' + result.baccarat;
       }
       text += '\n';
