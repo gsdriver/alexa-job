@@ -14,9 +14,6 @@ const SES = new AWS.SES();
 const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 
-const ONEDAY = 24*60*60*1000;
-const ONEMONTH = 30*24*60*60*1000;
-
 exports.handler = function(event, context, callback) {
   // Note if this is triggered by an s3 upload
   if (event.Records && (event.Records.length > 0)) {
@@ -84,37 +81,37 @@ function getMailText(callback) {
       completed();
     });
 
-    getRouletteMail(lastRun.roulette, (text, details) => {
+    getGenericMail('RouletteWheel', 'ROULETTE', lastRun.roulette, (text, details) => {
       rouletteText = text;
       summary.roulette = details;
       completed();
     });
 
-    getSlotsMail(lastRun.slots, (text, details) => {
+    getGenericMail('Slots', 'SLOT MACHINE', lastRun.slots, (text, details) => {
       slotText = text;
       summary.slots = details;
       completed();
     });
 
-    getPokerMail(lastRun.poker, (text, details) => {
+    getGenericMail('VideoPoker', 'VIDEO POKER', lastRun.poker, (text, details) => {
       pokerText = text;
       summary.poker = details;
       completed();
     });
 
-    getCrapsMail(lastRun.craps, (text, details) => {
+    getGenericMail('Craps', 'CRAPS TABLE', lastRun.craps, (text, details) => {
       crapsText = text;
       summary.craps = details;
       completed();
     });
 
-    getWarMail(lastRun.war, (text, details) => {
+    getGenericMail('War', 'CASINO WAR', lastRun.war, (text, details) => {
       warText = text;
       summary.war = details;
       completed();
     });
 
-    getBaccaratMail(lastRun.baccarat, (text, details) => {
+    getGenericMail('Baccarat', 'BACCARAT', lastRun.baccarat, (text, details) => {
       baccaratText = text;
       summary.baccarat = details;
       completed();
@@ -133,7 +130,6 @@ function getMailText(callback) {
 function getBlackjackMail(previousDay, callback) {
   let text;
   const adsPlayed = [];
-  const now = Date.now();
   const players = {};
   let recentPlayers = 0;
   let lastMonthPlayers = 0;
@@ -149,27 +145,15 @@ function getBlackjackMail(previousDay, callback) {
       countAds(attributes, adsPlayed);
       totalPlayers++;
       players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
-      let game;
-      let playedLastDay = false;
-      let playedLastMonth = false;
-      for (game in attributes) {
-        if (attributes[game] && attributes[game].timestamp) {
-          if (now - attributes[game].timestamp < ONEDAY) {
-            playedLastDay = true;
-          }
-          if (now - attributes[game].timestamp < ONEMONTH) {
-            playedLastMonth = true;
-          }
-        }
-      }
+      const recent = recentPlay(attributes);
 
       if (attributes.spanish) {
         spanishPlayers++;
       }
-      if (playedLastDay) {
+      if (recent.lastDay) {
         recentPlayers++;
       }
-      if (playedLastMonth) {
+      if (recent.lastMonth) {
         lastMonthPlayers++;
       }
 
@@ -222,419 +206,6 @@ function getBlackjackMail(previousDay, callback) {
         text += getAdText(adsPlayed);
         callback(text, details);
       });
-    }
-  });
-}
-
-function getRouletteMail(previousDay, callback) {
-  let text;
-  const adsPlayed = [];
-  const now = Date.now();
-  const players = {};
-  let totalPlayers = 0;
-  const american = {players: 0, recent: 0};
-  const european = {players: 0, recent: 0};
-  let displayDevices = 0;
-  const details = {};
-  const lastRun = (previousDay ? previousDay : {});
-
-  processDBEntries('RouletteWheel',
-    (attributes) => {
-      countAds(attributes, adsPlayed);
-      totalPlayers++;
-      players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
-      if (attributes.american) {
-        const game = attributes.american;
-        if (game.spins) {
-          american.players++;
-        }
-        if (game.timestamp &&
-          (now - game.timestamp < ONEDAY)) {
-          american.recent++;
-        }
-      }
-      if (attributes.european) {
-        const game = attributes.european;
-        if (game.spins) {
-          european.players++;
-        }
-        if (game.timestamp &&
-          (now - game.timestamp < ONEDAY)) {
-          european.recent++;
-        }
-      }
-      if (attributes.display) {
-        displayDevices++;
-      }
-    },
-    (err, results) => {
-    if (err) {
-      callback('Error getting roulette data: ' + err);
-    } else {
-      const rows = [];
-
-      // Save JSON details
-      details.totalPlayers = totalPlayers;
-      details.players = players;
-      details.displayDevices = displayDevices;
-      details.american = american;
-      details.european = european;
-
-      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
-        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
-      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
-        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
-      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
-        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
-      rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
-        (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
-      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
-      rows.push(getSummaryTableRow('American Wheel Players', deltaValue(american.players,
-        (lastRun.american) ? lastRun.american.players : undefined)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(american.recent,
-        (lastRun.american) ? lastRun.american.recent : undefined),
-        {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('European Wheel Players', deltaValue(european.players,
-        (lastRun.european) ? lastRun.european.players : undefined)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(european.recent,
-        (lastRun.european) ? lastRun.european.recent : undefined),
-        {boldSecondColumn: true}));
-
-      text = getSummaryTable('ROULETTE', rows);
-      text += getAdText(adsPlayed);
-      callback(text, details);
-    }
-  });
-}
-
-function getSlotsMail(previousDay, callback) {
-  let text;
-  const adsPlayed = [];
-  const now = Date.now();
-  const players = {};
-  const games = {};
-  let totalPlayers = 0;
-  let recentPlayers = 0;
-  let numGames = 0;
-  let game;
-  let isRecent;
-  let displayDevices = 0;
-  const details = {};
-  const lastRun = (previousDay ? previousDay : {});
-
-  processDBEntries('Slots',
-    (attributes) => {
-      countAds(attributes, adsPlayed);
-      totalPlayers++;
-      isRecent = false;
-      players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
-      for (game in attributes) {
-        if (game && (attributes[game].spins)) {
-          if (!games[game]) {
-            games[game] = {};
-            numGames++;
-          }
-          games[game].players = (games[game].players + 1) || 1;
-
-          if (attributes[game].timestamp &&
-            (now - attributes[game].timestamp < ONEDAY)) {
-            games[game].recent = (games[game].recent + 1) || 1;
-            isRecent = true;
-          }
-        }
-      }
-      if (attributes.display) {
-        displayDevices++;
-      }
-      if (isRecent) {
-        recentPlayers++;
-      }
-    },
-    (err, results) => {
-    if (err) {
-      callback('Error getting slots data: ' + err);
-    } else {
-      const rows = [];
-      let readGames = 0;
-
-      // Build up the details
-      details.totalPlayers = totalPlayers;
-      details.displayDevices = displayDevices;
-      details.players = players;
-      details.recentPlayers = recentPlayers;
-      details.games = {};
-
-      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers),
-        {boldSecondColumn: true}));
-
-      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
-        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
-      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
-        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
-      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
-        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
-      rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
-        (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
-      rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
-        (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
-
-      for (game in games) {
-        if (game) {
-          getSlotsProgressive(game, (game, coins) => {
-            details.games[game] = games[game];
-
-            rows.push(getSummaryTableRow('Total ' + game + ' Players', deltaValue(games[game].players,
-              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].players : undefined)));
-            rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(games[game].recent,
-              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].recent : undefined),
-              {boldSecondColumn: true}));
-            if (coins && (coins > 0)) {
-              details.games[game].coins = coins;
-              rows.push(getSummaryTableRow('Progressive Coins', deltaValue(coins,
-                (lastRun.games && lastRun.games[game]) ? lastRun.games[game].coins : undefined)));
-            }
-
-            // Are we done?
-            readGames++;
-            if (readGames === numGames) {
-              rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
-              text = getSummaryTable('SLOT MACHINE', rows);
-              text += getAdText(adsPlayed);
-              callback(text, details);
-            }
-          });
-        }
-      }
-    }
-  });
-}
-
-function getPokerMail(previousDay, callback) {
-  let text;
-  const adsPlayed = [];
-  const now = Date.now();
-  const games = {};
-  let totalPlayers = 0;
-  let numGames = 0;
-  let displayDevices = 0;
-  let game;
-  const details = {};
-  const lastRun = (previousDay ? previousDay : {});
-
-  processDBEntries('VideoPoker',
-    (attributes) => {
-      countAds(attributes, adsPlayed);
-      totalPlayers++;
-      for (game in attributes) {
-        if (game && (attributes[game].spins)) {
-          if (!games[game]) {
-            games[game] = {};
-            numGames++;
-          }
-          games[game].players = (games[game].players + 1) || 1;
-
-          if (attributes[game].timestamp &&
-            (now - attributes[game].timestamp < ONEDAY)) {
-            games[game].recent = (games[game].recent + 1) || 1;
-          }
-        }
-      }
-      if (attributes.display) {
-        displayDevices++;
-      }
-    },
-    (err, results) => {
-    if (err) {
-      callback('Error getting slots data: ' + err);
-    } else {
-      const rows = [];
-      let readGames = 0;
-
-      // Build JSON details
-      details.totalPlayers = totalPlayers;
-      details.displayDevices = displayDevices;
-      details.games = {};
-
-      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      for (game in games) {
-        if (game) {
-          getPokerProgressive(game, (game, coins) => {
-            details.games[game] = games[game];
-
-            rows.push(getSummaryTableRow('Total ' + game + ' Players', deltaValue(games[game].players,
-              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].players : undefined)));
-            rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(games[game].recent,
-              (lastRun.games && lastRun.games[game]) ? lastRun.games[game].recent : undefined),
-              {boldSecondColumn: true}));
-            if (coins && (coins > 0)) {
-              details.games[game].coins = coins;
-              rows.push(getSummaryTableRow('Progressive Coins', deltaValue(coins,
-                (lastRun.games && lastRun.games[game]) ? lastRun.games[game].coins : undefined)));
-            }
-
-            // Are we done?
-            readGames++;
-            if (readGames === numGames) {
-              rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
-              text = getSummaryTable('VIDEO POKER', rows);
-              text += getAdText(adsPlayed);
-              callback(text, details);
-            }
-          });
-        }
-      }
-    }
-  });
-}
-
-function getCrapsMail(previousDay, callback) {
-  let text;
-  const adsPlayed = [];
-  const now = Date.now();
-  let totalPlayers = 0;
-  let recent = 0;
-  let rounds = 0;
-  const details = {};
-  const lastRun = (previousDay ? previousDay : {});
-  let displayDevices = 0;
-
-  processDBEntries('Craps',
-    (attributes) => {
-      countAds(attributes, adsPlayed);
-      totalPlayers++;
-      if (attributes.basic && attributes.basic.timestamp &&
-        (now - attributes.basic.timestamp < ONEDAY)) {
-        recent++;
-      }
-      if (attributes.basic && attributes.basic.rounds) {
-        rounds += attributes.basic.rounds;
-      }
-      if (attributes.display) {
-        displayDevices++;
-      }
-    },
-    (err, results) => {
-    if (err) {
-      callback('Error getting slots data: ' + err);
-    } else {
-      // Build JSON details
-      details.totalPlayers = totalPlayers;
-      details.displayDevices = displayDevices;
-      details.recent = recent;
-      details.rounds = rounds;
-
-      const rows = [];
-      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
-      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
-      text = getSummaryTable('CRAPS', rows);
-      text += getAdText(adsPlayed);
-      callback(text, details);
-    }
-  });
-}
-
-function getWarMail(previousDay, callback) {
-  let text;
-  const adsPlayed = [];
-  const now = Date.now();
-  let totalPlayers = 0;
-  let recent = 0;
-  let rounds = 0;
-  const details = {};
-  const lastRun = (previousDay ? previousDay : {});
-  let displayDevices = 0;
-
-  processDBEntries('War',
-    (attributes) => {
-      countAds(attributes, adsPlayed);
-      totalPlayers++;
-      if (attributes.basic && attributes.basic.timestamp &&
-        (now - attributes.basic.timestamp < ONEDAY)) {
-        recent++;
-      }
-      if (attributes.basic && attributes.basic.rounds) {
-        rounds += attributes.basic.rounds;
-      }
-      if (attributes.display) {
-        displayDevices++;
-      }
-    },
-    (err, results) => {
-    if (err) {
-      callback('Error getting war data: ' + err);
-    } else {
-      // Build JSON details
-      details.totalPlayers = totalPlayers;
-      details.displayDevices = displayDevices;
-      details.recent = recent;
-      details.rounds = rounds;
-
-      const rows = [];
-      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
-      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
-      text = getSummaryTable('WAR', rows);
-      text += getAdText(adsPlayed);
-      callback(text, details);
-    }
-  });
-}
-
-function getBaccaratMail(previousDay, callback) {
-  let text;
-  const adsPlayed = [];
-  const now = Date.now();
-  let totalPlayers = 0;
-  let recent = 0;
-  let rounds = 0;
-  const details = {};
-  const lastRun = (previousDay ? previousDay : {});
-  let displayDevices = 0;
-  let maxMartini = 0;
-
-  processDBEntries('Baccarat',
-    (attributes) => {
-      countAds(attributes, adsPlayed);
-      totalPlayers++;
-      if (attributes.basic && attributes.basic.timestamp &&
-        (now - attributes.basic.timestamp < ONEDAY)) {
-        recent++;
-      }
-      if (attributes.basic && attributes.basic.rounds) {
-        rounds += attributes.basic.rounds;
-      }
-      if (attributes.maxMartini && (attributes.maxMartini > maxMartini)) {
-        maxMartini = attributes.maxMartini;
-      }
-      if (attributes.display) {
-        displayDevices++;
-      }
-    },
-    (err, results) => {
-    if (err) {
-      callback('Error getting baccarat data: ' + err);
-    } else {
-      // Build JSON details
-      details.totalPlayers = totalPlayers;
-      details.displayDevices = displayDevices;
-      details.recent = recent;
-      details.rounds = rounds;
-      details.maxMartini = maxMartini;
-
-      const rows = [];
-      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recent, lastRun.recent), {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('Rounds Played', deltaValue(rounds, lastRun.rounds)));
-      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
-      rows.push(getSummaryTableRow('Biggest Drinker', deltaValue(maxMartini, lastRun.maxMartini)));
-      text = getSummaryTable('BACCARAT', rows);
-      text += getAdText(adsPlayed);
-      callback(text, details);
     }
   });
 }
@@ -694,44 +265,6 @@ function getBlackjackProgressive(game, callback) {
       }
 
       callback(game, hands, jackpots);
-    }
-  });
-}
-
-function getSlotsProgressive(game, callback) {
-  // Read from database
-  doc.get({TableName: 'Slots', Key: {userId: 'game-' + game}},
-          (err, data) => {
-    if (err || (data.Item === undefined)) {
-      callback(game, undefined);
-    } else {
-      // Do we have
-      let coins;
-
-      if (data.Item.coins) {
-        coins = parseInt(data.Item.coins);
-      }
-
-      callback(game, coins);
-    }
-  });
-}
-
-function getPokerProgressive(game, callback) {
-  // Read from database
-  doc.get({TableName: 'VideoPoker', Key: {userId: 'game-' + game}},
-          (err, data) => {
-    if (err || (data.Item === undefined)) {
-      callback(game, undefined);
-    } else {
-      // Do we have
-      let coins;
-
-      if (data.Item.coins) {
-        coins = parseInt(data.Item.coins);
-      }
-
-      callback(game, coins);
     }
   });
 }
@@ -814,17 +347,24 @@ function getAdText(adsPlayed) {
   const rowFormat = ' <tr style=\'mso-yfti-irow:0\'><td width=144 valign=top style=\'width:107.75pt;border:solid #A8D08D 1.0pt;mso-border-themecolor:accent6;mso-border-themetint:153;border-top:none;mso-border-top-alt:solid #A8D08D .5pt;mso-border-top-themecolor:accent6;mso-border-top-themetint:153;mso-border-alt:solid #A8D08D .5pt;mso-border-themecolor:accent6;mso-border-themetint:153;background:#E2EFD9;mso-background-themecolor:accent6;mso-background-themetint:51;padding:0in 5.4pt 0in 5.4pt\'><p class=MsoNormal style=\'margin-bottom:0in;margin-bottom:.0001pt;line-height:normal;mso-yfti-cnfc:68\'><b>{0}<o:p></o:p></b></p></td><td width=258 valign=top style=\'width:193.5pt;border-top:none;border-left:none;border-bottom:solid #A8D08D 1.0pt;mso-border-bottom-themecolor:accent6;mso-border-bottom-themetint:153;border-right:solid #A8D08D 1.0pt;mso-border-right-themecolor:accent6;mso-border-right-themetint:153;mso-border-top-alt:solid #A8D08D .5pt;mso-border-top-themecolor:accent6;mso-border-top-themetint:153;mso-border-left-alt:solid #A8D08D .5pt;mso-border-left-themecolor:accent6;mso-border-left-themetint:153;mso-border-alt:solid #A8D08D .5pt;mso-border-themecolor:accent6;mso-border-themetint:153;background:#E2EFD9;mso-background-themecolor:accent6;mso-background-themetint:51;padding:0in 5.4pt 0in 5.4pt\'><p class=MsoNormal style=\'margin-bottom:0in;margin-bottom:.0001pt;line-height:normal;mso-yfti-cnfc:64\'>{1}</p></td></tr>';
   let htmlText;
   let tableRow;
+  const adArray = [];
 
+  // Sort ads played (most to least plays)
   htmlText = tableStart;
   if (adsPlayed) {
     let ad;
 
     for (ad in adsPlayed) {
       if (ad) {
-        tableRow = rowFormat.replace('{0}', ad).replace('{1}', adsPlayed[ad]);
-        htmlText += tableRow;
+        adArray.push({ad: ad, count: adsPlayed[ad]});
       }
     }
+
+    adArray.sort((a, b) => (b.count - a.count));
+    adArray.forEach((ad) => {
+      tableRow = rowFormat.replace('{0}', ad.ad).replace('{1}', ad.count);
+      htmlText += tableRow;
+    });
   }
   htmlText += tableEnd;
 
@@ -855,4 +395,92 @@ function deltaValue(newvalue, oldvalue) {
   } else {
     return value + ' (<font color=green>up ' + delta + '</font>)';
   }
+}
+
+function recentPlay(attributes) {
+  let game;
+  let playedLastDay = false;
+  let playedLastMonth = false;
+  const now = Date.now();
+  const ONEDAY = 24*60*60*1000;
+  const ONEMONTH = 30*24*60*60*1000;
+
+  for (game in attributes) {
+    if (attributes[game] && attributes[game].timestamp) {
+      if (now - attributes[game].timestamp < ONEDAY) {
+        playedLastDay = true;
+      }
+      if (now - attributes[game].timestamp < ONEMONTH) {
+        playedLastMonth = true;
+      }
+    }
+  }
+
+  return {lastDay: playedLastDay, lastMonth: playedLastMonth};
+}
+
+function getGenericMail(dbName, title, previousDay, callback) {
+  let text;
+  const adsPlayed = [];
+  const players = {};
+  let totalPlayers = 0;
+  let displayDevices = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
+  let recentPlayers = 0;
+  let lastMonthPlayers = 0;
+
+  processDBEntries(dbName,
+    (attributes) => {
+      countAds(attributes, adsPlayed);
+      totalPlayers++;
+      players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
+      const recent = recentPlay(attributes);
+
+      if (recent.lastDay) {
+        recentPlayers++;
+      }
+      if (recent.lastMonth) {
+        lastMonthPlayers++;
+      }
+      if (attributes.display) {
+        displayDevices++;
+      }
+    },
+    (err, results) => {
+    if (err) {
+      callback('Error getting ' + title + ' data: ' + err);
+    } else {
+      const rows = [];
+
+      // Build JSON details
+      details.totalPlayers = totalPlayers;
+      details.displayDevices = displayDevices;
+      details.players = players;
+      details.recentPlayers = recentPlayers;
+      details.lastMonthPlayers = lastMonthPlayers;
+
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers),
+        {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Past 30 Days', deltaValue(lastMonthPlayers, lastRun.lastMonthPlayers),
+        {boldSecondColumn: true}));
+
+      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
+        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
+      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
+        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
+      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
+        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
+      rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
+        (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
+      rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
+        (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+
+      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
+      text = getSummaryTable(title, rows);
+      text += getAdText(adsPlayed);
+      callback(text, details);
+    }
+  });
 }
