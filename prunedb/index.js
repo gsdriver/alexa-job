@@ -38,28 +38,31 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 7;
+  let toRun = 8;
   const summary = {};
 
-  pruneRecords('PlayBlackjack', summary, (err) => {
+  pruneRecords('PlayBlackjack', 'userId', 'mapAttr', summary, (err) => {
     completed();
   });
-  pruneRecords('RouletteWheel', summary, (err) => {
+  pruneRecords('RouletteWheel', 'userId', 'mapAttr', summary, (err) => {
     completed();
   });
-  pruneRecords('Slots', summary, (err) => {
+  pruneRecords('Slots', 'userId', 'mapAttr', summary, (err) => {
     completed();
   });
-  pruneRecords('VideoPoker', summary, (err) => {
+  pruneRecords('VideoPoker', 'userId', 'mapAttr', summary, (err) => {
     completed();
   });
-  pruneRecords('Craps', summary, (err) => {
+  pruneRecords('Craps', 'userId', 'mapAttr', summary, (err) => {
     completed();
   });
-  pruneRecords('War', summary, (err) => {
+  pruneRecords('War', 'userId', 'mapAttr', summary, (err) => {
     completed();
   });
-  pruneRecords('Baccarat', summary, (err) => {
+  pruneRecords('Baccarat', 'userId', 'mapAttr', summary, (err) => {
+    completed();
+  });
+  pruneRecords('BlackjackParty', 'id', 'attributes', summary, (err) => {
     completed();
   });
 
@@ -81,30 +84,31 @@ function getMailText(callback) {
   }
 }
 
-function pruneRecords(dbName, summary, callback) {
+function pruneRecords(dbName, idField, attributeField, summary, callback) {
   let text;
   const oldPlayers = [];
   let newPlayers = 0;
   const now = Date.now();
 
-  processDBEntries(dbName,
+  processDBEntries(dbName, attributeField,
     (item) => {
       let game;
       let newestTimestamp;
+      const attributes = item[attributeField];
 
-      for (game in item.mapAttr) {
-        if (game && item.mapAttr[game] && item.mapAttr[game].timestamp) {
+      for (game in attributes) {
+        if (game && attributes[game] && attributes[game].timestamp) {
           if (!newestTimestamp) {
-            newestTimestamp = item.mapAttr[game].timestamp;
-          } else if (item.mapAttr[game].timestamp > newestTimestamp) {
-            newestTimestamp = item.mapAttr[game].timestamp;
+            newestTimestamp = attributes[game].timestamp;
+          } else if (attributes[game].timestamp > newestTimestamp) {
+            newestTimestamp = attributes[game].timestamp;
           }
         }
       }
 
       if (newestTimestamp && ((now - newestTimestamp) > RETENTION)) {
         // This one is old
-        oldPlayers.push(item.userId);
+        oldPlayers.push(item[idField]);
       } else {
         newPlayers++;
       }
@@ -117,7 +121,9 @@ function pruneRecords(dbName, summary, callback) {
       let numItems = oldPlayers.length;
 
       oldPlayers.forEach((player) => {
-        doc.delete({TableName: dbName, Key: {userId: player}}, (err, data) => {
+        const key = {};
+        key[idField] = player;
+        doc.delete({TableName: dbName, Key: key}, (err, data) => {
           if (--numItems == 0) {
             done();
           }
@@ -134,7 +140,7 @@ function pruneRecords(dbName, summary, callback) {
   });
 }
 
-function processDBEntries(dbName, callback, complete) {
+function processDBEntries(dbName, attributeField, callback, complete) {
   const results = [];
 
   // Loop thru to read in all items from the DB
@@ -149,7 +155,7 @@ function processDBEntries(dbName, callback, complete) {
        let i;
 
        for (i = 0; i < data.Items.length; i++) {
-         if (data.Items[i].mapAttr) {
+         if (data.Items[i][attributeField]) {
            const entry = callback(data.Items[i]);
            if (entry) {
              results.push(entry);

@@ -49,7 +49,7 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 7;
+  let toRun = 8;
   let bjText;
   let slotText;
   let rouletteText;
@@ -76,6 +76,12 @@ function getMailText(callback) {
     }
 
     getBlackjackMail(lastRun.blackjack, (text, details) => {
+      bjText = text;
+      summary.blackjack = details;
+      completed();
+    });
+
+    getBlackjackPartyMail(lastRun.blackjackParty, (text, details) => {
       bjText = text;
       summary.blackjack = details;
       completed();
@@ -140,7 +146,7 @@ function getBlackjackMail(previousDay, callback) {
   let spanishPlayers = 0;
   let displayDevices = 0;
 
-  processDBEntries('PlayBlackjack',
+  processDBEntries('PlayBlackjack', 'mapAttr',
     (attributes) => {
       countAds(attributes, adsPlayed);
       totalPlayers++;
@@ -210,7 +216,84 @@ function getBlackjackMail(previousDay, callback) {
   });
 }
 
-function processDBEntries(dbName, callback, complete) {
+function getBlackjackPartyMail(previousDay, callback) {
+  let text;
+  const adsPlayed = [];
+  const players = {};
+  let recentPlayers = 0;
+  let lastMonthPlayers = 0;
+  let totalPlayers = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
+  let trainingPlayers = 0;
+  let displayDevices = 0;
+  let buttonUsers = 0;
+
+  processDBEntries('BlackjackParty', 'attributes',
+    (attributes) => {
+      countAds(attributes, adsPlayed);
+      totalPlayers++;
+      players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
+      const recent = recentPlay(attributes);
+
+      if (recent.lastDay) {
+        recentPlayers++;
+      }
+      if (recent.lastMonth) {
+        lastMonthPlayers++;
+      }
+
+      if (attributes.standard && attributes.standard.training) {
+        trainingPlayers++;
+      } else if (attributes.tournament && attributes.tournament.training) {
+        trainingPlayers++;
+      }
+      if (attributes.display) {
+        displayDevices++;
+      }
+      if (attributes.usedButton) {
+        buttonUsers++;
+      }
+    },
+    (err, results) => {
+    if (err) {
+      callback('Error getting blackjack party data: ' + err);
+    } else {
+      const rows = [];
+
+      // Build up the JSON details
+      details.totalPlayers = totalPlayers;
+      details.recentPlayers = recentPlayers;
+      details.lastMonthPlayers = lastMonthPlayers;
+      details.buttonUsers = buttonUsers;
+      details.players = players;
+      details.trainingPlayers = trainingPlayers;
+      details.progressiveHands = progressiveHands;
+      details.displayDevices = displayDevices;
+
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers), {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Past 30 Days', deltaValue(lastMonthPlayers, lastRun.lastMonthPlayers), {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
+        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
+      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
+        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
+      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
+        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
+      rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
+        (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+      rows.push(getSummaryTableRow('Button Players', deltaValue(buttonUsers, lastRun.buttonUsers)));
+      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
+      rows.push(getSummaryTableRow('Training Players', deltaValue(trainingPlayers, lastRun.trainingPlayers)));
+
+      text = getSummaryTable('BLACKJACK PARTY', rows);
+      text += getAdText(adsPlayed);
+      callback(text, details);
+    }
+  });
+}
+
+function processDBEntries(dbName, attributeField, callback, complete) {
   const results = [];
 
   // Loop thru to read in all items from the DB
@@ -225,8 +308,8 @@ function processDBEntries(dbName, callback, complete) {
        let i;
 
        for (i = 0; i < data.Items.length; i++) {
-         if (data.Items[i].mapAttr) {
-           const entry = callback(data.Items[i].mapAttr);
+         if (data.Items[i][attributeField]) {
+           const entry = callback(data.Items[i][attributeField]);
            if (entry) {
              results.push(entry);
            }
@@ -430,7 +513,7 @@ function getGenericMail(dbName, title, previousDay, callback) {
   let recentPlayers = 0;
   let lastMonthPlayers = 0;
 
-  processDBEntries(dbName,
+  processDBEntries(dbName, 'mapAttr',
     (attributes) => {
       countAds(attributes, adsPlayed);
       totalPlayers++;
