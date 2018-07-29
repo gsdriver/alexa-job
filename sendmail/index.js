@@ -51,6 +51,7 @@ exports.handler = function(event, context, callback) {
 function getMailText(callback) {
   let toRun = 8;
   let bjText;
+  let bjPartyText;
   let slotText;
   let rouletteText;
   let pokerText;
@@ -82,8 +83,8 @@ function getMailText(callback) {
     });
 
     getBlackjackPartyMail(lastRun.blackjackParty, (text, details) => {
-      bjText = text;
-      summary.blackjack = details;
+      bjPartyText = text;
+      summary.blackjackParty = details;
       completed();
     });
 
@@ -126,7 +127,7 @@ function getMailText(callback) {
     function completed() {
       toRun--;
       if (toRun === 0) {
-        const mailBody = '<HTML>' + bjText + rouletteText + slotText + pokerText + crapsText + warText + baccaratText + '</HTML>';
+        const mailBody = '<HTML>' + bjText + bjPartyText + rouletteText + slotText + pokerText + crapsText + warText + baccaratText + '</HTML>';
         callback(mailBody, summary);
       }
     }
