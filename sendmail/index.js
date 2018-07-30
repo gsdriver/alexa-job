@@ -269,7 +269,6 @@ function getBlackjackPartyMail(previousDay, callback) {
       details.buttonUsers = buttonUsers;
       details.players = players;
       details.trainingPlayers = trainingPlayers;
-      details.progressiveHands = progressiveHands;
       details.displayDevices = displayDevices;
 
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
