@@ -16,9 +16,12 @@ const s3 = new AWS.S3({apiVersion: '2006-03-01'});
 
 exports.handler = function(event, context, callback) {
   // Note if this is triggered by an s3 upload
+  // If it is, we won't save the results (just do a one-off mail)
+  let trigger;
   if (event.Records && (event.Records.length > 0)) {
     if (event.Records[0].s3 && event.Records[0].s3.object) {
       console.log('Send mail triggered by ' + event.Records[0].s3.object.key);
+      trigger = event.Records[0].s3.object.key;
     }
   }
   context.callbackWaitsForEmptyEventLoop = false;
@@ -31,18 +34,22 @@ exports.handler = function(event, context, callback) {
       } else {
         console.log('Mail sent!');
 
-        // And write the summary out to S3
-        const today = new Date();
-        today.setDate(today.getDate() - 1);
-        const params = {Body: JSON.stringify(summary),
-          Bucket: 'garrett-alexa-usage',
-          Key: 'dailysummary/' + getFormattedDate(today, '-') + '.txt'};
-        s3.putObject(params, (err, data) => {
-          if (err) {
-            console.log('Error writing to S3 ' + err.stack);
-          }
+        // And write the summary out to S3 if we weren't triggered
+        if (trigger === undefined) {
+          const today = new Date();
+          today.setDate(today.getDate() - 1);
+          const params = {Body: JSON.stringify(summary),
+            Bucket: 'garrett-alexa-usage',
+            Key: 'dailysummary/' + getFormattedDate(today, '-') + '.txt'};
+          s3.putObject(params, (err, data) => {
+            if (err) {
+              console.log('Error writing to S3 ' + err.stack);
+            }
+            callback();
+          });
+        } else {
           callback();
-        });
+        }
       }
     });
   });
@@ -88,15 +95,15 @@ function getMailText(callback) {
       completed();
     });
 
-    getGenericMail('RouletteWheel', 'ROULETTE', lastRun.roulette, (text, details) => {
-      rouletteText = text;
-      summary.roulette = details;
+    getSlotsMail(lastRun.slots, (text, details) => {
+      slotText = text;
+      summary.slots = details;
       completed();
     });
 
-    getGenericMail('Slots', 'SLOT MACHINE', lastRun.slots, (text, details) => {
-      slotText = text;
-      summary.slots = details;
+    getGenericMail('RouletteWheel', 'ROULETTE', lastRun.roulette, (text, details) => {
+      rouletteText = text;
+      summary.roulette = details;
       completed();
     });
 
@@ -127,7 +134,7 @@ function getMailText(callback) {
     function completed() {
       toRun--;
       if (toRun === 0) {
-        const mailBody = '<HTML>' + bjText + bjPartyText + rouletteText + slotText + pokerText + crapsText + warText + baccaratText + '</HTML>';
+        const mailBody = '<HTML>' + bjText + bjPartyText + slotText + rouletteText + pokerText + crapsText + warText + baccaratText + '</HTML>';
         callback(mailBody, summary);
       }
     }
@@ -287,6 +294,84 @@ function getBlackjackPartyMail(previousDay, callback) {
       rows.push(getSummaryTableRow('Training Players', deltaValue(trainingPlayers, lastRun.trainingPlayers)));
 
       text = getSummaryTable('BLACKJACK PARTY', rows);
+      text += getAdText(adsPlayed);
+      callback(text, details);
+    }
+  });
+}
+
+function getSlotsMail(previousDay, callback) {
+  let text;
+  const adsPlayed = [];
+  const players = {};
+  let totalPlayers = 0;
+  let displayDevices = 0;
+  const details = {};
+  const lastRun = (previousDay ? previousDay : {});
+  let recentPlayers = 0;
+  let lastMonthPlayers = 0;
+  let googlePlayers = 0;
+  let buttonUsers = 0;
+
+  processDBEntries('Slots', 'mapAttr',
+    (attributes) => {
+      countAds(attributes, adsPlayed);
+      totalPlayers++;
+      players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
+      const recent = recentPlay(attributes);
+
+      if (recent.lastDay) {
+        recentPlayers++;
+      }
+      if (recent.lastMonth) {
+        lastMonthPlayers++;
+      }
+      if (attributes.display) {
+        displayDevices++;
+      }
+      if (attributes.usedButton) {
+        buttonUsers++;
+      }
+      if (attributes.platform === 'google') {
+        googlePlayers++;
+      }
+    },
+    (err, results) => {
+    if (err) {
+      callback('Error getting Slot Machine data: ' + err);
+    } else {
+      const rows = [];
+
+      // Build JSON details
+      details.totalPlayers = totalPlayers;
+      details.displayDevices = displayDevices;
+      details.players = players;
+      details.recentPlayers = recentPlayers;
+      details.lastMonthPlayers = lastMonthPlayers;
+      details.buttonUsers = buttonUsers;
+      details.googlePlayers = googlePlayers;
+
+      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
+      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers),
+        {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Past 30 Days', deltaValue(lastMonthPlayers, lastRun.lastMonthPlayers),
+        {boldSecondColumn: true}));
+
+      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
+        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
+      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
+        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
+      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
+        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
+      rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
+        (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
+      rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
+        (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+
+      rows.push(getSummaryTableRow('Google Players', deltaValue(googlePlayers, lastRun.googlePlayers)));
+      rows.push(getSummaryTableRow('Button Users', deltaValue(buttonUsers, lastRun.buttonUsers)));
+      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
+      text = getSummaryTable('SLOT MACHINE', rows);
       text += getAdText(adsPlayed);
       callback(text, details);
     }
