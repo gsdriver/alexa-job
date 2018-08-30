@@ -308,32 +308,48 @@ function getSlotsMail(previousDay, callback) {
   let displayDevices = 0;
   const details = {};
   const lastRun = (previousDay ? previousDay : {});
-  let recentPlayers = 0;
-  let lastMonthPlayers = 0;
+  let recentAlexaPlayers = 0;
+  let recentGooglePlayers = 0;
+  let lastMonthAlexaPlayers = 0;
+  let lastMonthGooglePlayers = 0;
   let googlePlayers = 0;
+  let googleNonPlayers = 0;
   let buttonUsers = 0;
 
   processDBEntries('Slots', 'mapAttr',
     (attributes) => {
       countAds(attributes, adsPlayed);
-      totalPlayers++;
       players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
       const recent = recentPlay(attributes);
 
-      if (recent.lastDay) {
-        recentPlayers++;
+      if (!recent.nonPlayer) {
+        totalPlayers++;
       }
-      if (recent.lastMonth) {
-        lastMonthPlayers++;
+      if (attributes.platform === 'google') {
+        if (recent.nonPlayer) {
+          googleNonPlayers++;
+        } else {
+          googlePlayers++;
+        }
+        if (recent.lastDay) {
+          recentGooglePlayers++;
+        }
+        if (recent.lastMonth) {
+          lastMonthGooglePlayers++;
+        }
+      } else {
+        if (recent.lastDay) {
+          recentAlexaPlayers++;
+        }
+        if (recent.lastMonth) {
+          lastMonthAlexaPlayers++;
+        }
       }
       if (attributes.display) {
         displayDevices++;
       }
       if (attributes.usedButton) {
         buttonUsers++;
-      }
-      if (attributes.platform === 'google') {
-        googlePlayers++;
       }
     },
     (err, results) => {
@@ -346,15 +362,22 @@ function getSlotsMail(previousDay, callback) {
       details.totalPlayers = totalPlayers;
       details.displayDevices = displayDevices;
       details.players = players;
-      details.recentPlayers = recentPlayers;
-      details.lastMonthPlayers = lastMonthPlayers;
+      details.recentAlexaPlayers = recentAlexaPlayers;
+      details.lastMonthAlexaPlayers = lastMonthAlexaPlayers;
+      details.recentGooglePlayers = recentGooglePlayers;
+      details.lastMonthGooglePlayers = lastMonthGooglePlayers;
       details.buttonUsers = buttonUsers;
       details.googlePlayers = googlePlayers;
+      details.googleNonPlayers = googleNonPlayers;
 
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers),
+      rows.push(getSummaryTableRow('Past 24 Hours (Alexa)', deltaValue(recentAlexaPlayers, lastRun.recentAlexaPlayers),
         {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('Past 30 Days', deltaValue(lastMonthPlayers, lastRun.lastMonthPlayers),
+      rows.push(getSummaryTableRow('Past 24 Hours (Google)', deltaValue(recentGooglePlayers, lastRun.recentGooglePlayers),
+        {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Past 30 Days (Alexa)', deltaValue(lastMonthAlexaPlayers, lastRun.lastMonthAlexaPlayers),
+        {boldSecondColumn: true}));
+      rows.push(getSummaryTableRow('Past 30 Days (Google)', deltaValue(lastMonthGooglePlayers, lastRun.lastMonthGooglePlayers),
         {boldSecondColumn: true}));
 
       rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
@@ -369,6 +392,7 @@ function getSlotsMail(previousDay, callback) {
         (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
 
       rows.push(getSummaryTableRow('Google Players', deltaValue(googlePlayers, lastRun.googlePlayers)));
+      rows.push(getSummaryTableRow('Google Users Who Haven\'t Played', deltaValue(googleNonPlayers, lastRun.googleNonPlayers)));
       rows.push(getSummaryTableRow('Button Users', deltaValue(buttonUsers, lastRun.buttonUsers)));
       rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
       text = getSummaryTable('SLOT MACHINE', rows);
@@ -572,9 +596,12 @@ function recentPlay(attributes) {
   const now = Date.now();
   const ONEDAY = 24*60*60*1000;
   const ONEMONTH = 30*24*60*60*1000;
+  let nonPlayer = true;
 
   for (game in attributes) {
     if (attributes[game] && attributes[game].timestamp) {
+      // At least they played
+      nonPlayer = false;
       if (now - attributes[game].timestamp < ONEDAY) {
         playedLastDay = true;
       }
@@ -584,7 +611,7 @@ function recentPlay(attributes) {
     }
   }
 
-  return {lastDay: playedLastDay, lastMonth: playedLastMonth};
+  return {lastDay: playedLastDay, lastMonth: playedLastMonth, nonPlayer: nonPlayer};
 }
 
 function getGenericMail(dbName, title, previousDay, callback) {
