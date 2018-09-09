@@ -89,43 +89,43 @@ function getMailText(callback) {
       completed();
     });
 
-    getBlackjackPartyMail(lastRun.blackjackParty, (text, details) => {
-      bjPartyText = text;
-      summary.blackjackParty = details;
-      completed();
-    });
-
     getSlotsMail(lastRun.slots, (text, details) => {
       slotText = text;
       summary.slots = details;
       completed();
     });
 
-    getGenericMail('RouletteWheel', 'ROULETTE', lastRun.roulette, (text, details) => {
+    getGenericMail('BlackjackParty', 'attributes', 'BLACKJACK PARTY', lastRun.blackjackParty, (text, details) => {
+      bjPartyText = text;
+      summary.blackjackParty = details;
+      completed();
+    });
+
+    getGenericMail('RouletteWheel', 'mapAttr', 'ROULETTE', lastRun.roulette, (text, details) => {
       rouletteText = text;
       summary.roulette = details;
       completed();
     });
 
-    getGenericMail('VideoPoker', 'VIDEO POKER', lastRun.poker, (text, details) => {
+    getGenericMail('VideoPoker', 'mapAttr', 'VIDEO POKER', lastRun.poker, (text, details) => {
       pokerText = text;
       summary.poker = details;
       completed();
     });
 
-    getGenericMail('Craps', 'CRAPS TABLE', lastRun.craps, (text, details) => {
+    getGenericMail('Craps', 'mapAttr', 'CRAPS TABLE', lastRun.craps, (text, details) => {
       crapsText = text;
       summary.craps = details;
       completed();
     });
 
-    getGenericMail('War', 'CASINO WAR', lastRun.war, (text, details) => {
+    getGenericMail('War', 'mapAttr', 'CASINO WAR', lastRun.war, (text, details) => {
       warText = text;
       summary.war = details;
       completed();
     });
 
-    getGenericMail('Baccarat', 'BACCARAT', lastRun.baccarat, (text, details) => {
+    getGenericMail('Baccarat', 'mapAttr', 'BACCARAT', lastRun.baccarat, (text, details) => {
       baccaratText = text;
       summary.baccarat = details;
       completed();
@@ -220,82 +220,6 @@ function getBlackjackMail(previousDay, callback) {
         text += getAdText(adsPlayed);
         callback(text, details);
       });
-    }
-  });
-}
-
-function getBlackjackPartyMail(previousDay, callback) {
-  let text;
-  const adsPlayed = [];
-  const players = {};
-  let recentPlayers = 0;
-  let lastMonthPlayers = 0;
-  let totalPlayers = 0;
-  const details = {};
-  const lastRun = (previousDay ? previousDay : {});
-  let trainingPlayers = 0;
-  let displayDevices = 0;
-  let buttonUsers = 0;
-
-  processDBEntries('BlackjackParty', 'attributes',
-    (attributes) => {
-      countAds(attributes, adsPlayed);
-      totalPlayers++;
-      players[attributes.playerLocale] = (players[attributes.playerLocale] + 1) || 1;
-      const recent = recentPlay(attributes);
-
-      if (recent.lastDay) {
-        recentPlayers++;
-      }
-      if (recent.lastMonth) {
-        lastMonthPlayers++;
-      }
-
-      if (attributes.standard && attributes.standard.training) {
-        trainingPlayers++;
-      } else if (attributes.tournament && attributes.tournament.training) {
-        trainingPlayers++;
-      }
-      if (attributes.display) {
-        displayDevices++;
-      }
-      if (attributes.usedButton) {
-        buttonUsers++;
-      }
-    },
-    (err, results) => {
-    if (err) {
-      callback('Error getting blackjack party data: ' + err);
-    } else {
-      const rows = [];
-
-      // Build up the JSON details
-      details.totalPlayers = totalPlayers;
-      details.recentPlayers = recentPlayers;
-      details.lastMonthPlayers = lastMonthPlayers;
-      details.buttonUsers = buttonUsers;
-      details.players = players;
-      details.trainingPlayers = trainingPlayers;
-      details.displayDevices = displayDevices;
-
-      rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
-      rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers), {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('Past 30 Days', deltaValue(lastMonthPlayers, lastRun.lastMonthPlayers), {boldSecondColumn: true}));
-      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
-        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
-      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
-        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
-      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
-        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
-      rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
-        (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
-      rows.push(getSummaryTableRow('Button Players', deltaValue(buttonUsers, lastRun.buttonUsers)));
-      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
-      rows.push(getSummaryTableRow('Training Players', deltaValue(trainingPlayers, lastRun.trainingPlayers)));
-
-      text = getSummaryTable('BLACKJACK PARTY', rows);
-      text += getAdText(adsPlayed);
-      callback(text, details);
     }
   });
 }
@@ -614,7 +538,7 @@ function recentPlay(attributes) {
   return {lastDay: playedLastDay, lastMonth: playedLastMonth, nonPlayer: nonPlayer};
 }
 
-function getGenericMail(dbName, title, previousDay, callback) {
+function getGenericMail(dbName, field, title, previousDay, callback) {
   let text;
   const adsPlayed = [];
   const players = {};
@@ -624,8 +548,10 @@ function getGenericMail(dbName, title, previousDay, callback) {
   const lastRun = (previousDay ? previousDay : {});
   let recentPlayers = 0;
   let lastMonthPlayers = 0;
+  let buttonUsers = 0;
+  let trainingPlayers = 0;
 
-  processDBEntries(dbName, 'mapAttr',
+  processDBEntries(dbName, field,
     (attributes) => {
       countAds(attributes, adsPlayed);
       totalPlayers++;
@@ -641,6 +567,15 @@ function getGenericMail(dbName, title, previousDay, callback) {
       if (attributes.display) {
         displayDevices++;
       }
+      if (attributes.usedButton) {
+        buttonUsers++;
+      }
+
+      if (attributes.standard && attributes.standard.training) {
+        trainingPlayers++;
+      } else if (attributes.tournament && attributes.tournament.training) {
+        trainingPlayers++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -654,6 +589,8 @@ function getGenericMail(dbName, title, previousDay, callback) {
       details.players = players;
       details.recentPlayers = recentPlayers;
       details.lastMonthPlayers = lastMonthPlayers;
+      details.buttonUsers = buttonUsers;
+      details.trainingPlayers = trainingPlayers;
 
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
       rows.push(getSummaryTableRow('Past 24 Hours', deltaValue(recentPlayers, lastRun.recentPlayers),
@@ -661,18 +598,27 @@ function getGenericMail(dbName, title, previousDay, callback) {
       rows.push(getSummaryTableRow('Past 30 Days', deltaValue(lastMonthPlayers, lastRun.lastMonthPlayers),
         {boldSecondColumn: true}));
 
-      rows.push(getSummaryTableRow('American Players', deltaValue(players['en-US'],
-        (lastRun.players) ? lastRun.players['en-US'] : undefined)));
-      rows.push(getSummaryTableRow('UK Players', deltaValue(players['en-GB'],
-        (lastRun.players) ? lastRun.players['en-GB'] : undefined)));
-      rows.push(getSummaryTableRow('Canadian Players', deltaValue(players['en-CA'],
-        (lastRun.players) ? lastRun.players['en-CA'] : undefined)));
-      rows.push(getSummaryTableRow('Indian Players', deltaValue(players['en-IN'],
-        (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
-      rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
-        (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+      const locales = {'en-US': 'American Players', 'en-GB': 'UK Players', 'en-CA': 'Canadian Players',
+        'en-IN': 'Indian Players', 'en-AU': 'Australian Players', 'de-DE': 'Das Germans',
+        'es-MX': 'Mexican Players'};
+      let locale;
+      for (locale in locales) {
+        if (players[locale]) {
+          rows.push(getSummaryTableRow(locales[locale], deltaValue(players[locale],
+            (lastRun.players) ? lastRun.players[locale] : undefined)));
+        }
+      }
 
-      rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
+      if (buttonUsers) {
+        rows.push(getSummaryTableRow('Button Players', deltaValue(buttonUsers, lastRun.buttonUsers)));
+      }
+      if (displayDevices) {
+        rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
+      }
+      if (trainingPlayers) {
+        rows.push(getSummaryTableRow('Training Players', deltaValue(trainingPlayers, lastRun.trainingPlayers)));
+      }
+
       text = getSummaryTable(title, rows);
       text += getAdText(adsPlayed);
       callback(text, details);
