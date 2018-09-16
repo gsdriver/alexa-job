@@ -63,6 +63,7 @@ function getMailText(callback) {
   let rouletteText;
   let pokerText;
   let crapsText;
+  let crapsPartyText;
   let warText;
   let baccaratText;
   const summary = {};
@@ -113,6 +114,12 @@ function getMailText(callback) {
       completed();
     });
 
+    getGenericMail('CrapsParty', 'attributes', 'CRAPS PARTY', lastRun.crapsParty, (text, details) => {
+      crapsPartyText = text;
+      summary.crapsParty = details;
+      completed();
+    });
+
     getGenericMail('Craps', 'mapAttr', 'CRAPS TABLE', lastRun.craps, (text, details) => {
       crapsText = text;
       summary.craps = details;
@@ -134,7 +141,7 @@ function getMailText(callback) {
     function completed() {
       toRun--;
       if (toRun === 0) {
-        const mailBody = '<HTML>' + bjText + bjPartyText + slotText + rouletteText + pokerText + crapsText + warText + baccaratText + '</HTML>';
+        const mailBody = '<HTML>' + bjText + bjPartyText + slotText + rouletteText + pokerText + crapsPartyText + crapsText + warText + baccaratText + '</HTML>';
         callback(mailBody, summary);
       }
     }
