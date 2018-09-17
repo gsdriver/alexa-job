@@ -56,7 +56,7 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 8;
+  let toRun = 9;
   let bjText;
   let bjPartyText;
   let slotText;
