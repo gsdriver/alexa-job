@@ -18,7 +18,7 @@ exports.handler = function(event, context, callback) {
   context.callbackWaitsForEmptyEventLoop = false;
 
   const dbNames = ['RouletteWheel', 'PlayBlackjack', 'Slots', 'VideoPoker',
-      'BlackjackParty', 'Craps', 'CasinoWar', 'Baccarat2'];
+      'BlackjackParty', 'Craps', 'CasinoWar', 'Baccarat', 'ThreeCardPoker'];
   let numCalls = dbNames.length;
   const now = getFormattedDate(new Date());
 

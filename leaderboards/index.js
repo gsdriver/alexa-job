@@ -22,7 +22,8 @@ exports.handler = function(event, context, callback) {
   request.post({url: process.env.SERVICEURL + 'slots/populateLeaderBoardFromDB'});
   request.post({url: process.env.SERVICEURL + 'war/populateLeaderBoardFromDB'});
   request.post({url: process.env.SERVICEURL + 'baccarat/populateLeaderBoardFromDB'});
+  request.post({url: process.env.SERVICEURL + 'threecard/populateLeaderBoardFromDB'});
 
-  console.log('Rebuilt leader boards!');
+  console.log('Rebuilt the leader boards!');
   callback();
 };
