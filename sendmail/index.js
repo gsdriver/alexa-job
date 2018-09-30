@@ -56,7 +56,7 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 9;
+  let toRun = 10;
   let bjText;
   let bjPartyText;
   let slotText;
@@ -66,6 +66,7 @@ function getMailText(callback) {
   let crapsPartyText;
   let warText;
   let baccaratText;
+  let threeCardText;
   const summary = {};
 
   // Before we do anything, we need to read in yesterday's results
@@ -138,10 +139,18 @@ function getMailText(callback) {
       completed();
     });
 
+    getGenericMail('ThreeCardPoker', 'attributes', 'THREE CARD POKER', lastRun.threeCard, (text, details) => {
+      threeCardText = text;
+      summary.threeCard = details;
+      completed();
+    });
+
     function completed() {
       toRun--;
       if (toRun === 0) {
-        const mailBody = '<HTML>' + bjText + bjPartyText + slotText + rouletteText + pokerText + crapsPartyText + crapsText + warText + baccaratText + '</HTML>';
+        const mailBody = '<HTML>' + bjText + bjPartyText + slotText + rouletteText
+          + pokerText + crapsPartyText + crapsText + warText + baccaratText
+          + threeCardText + '</HTML>';
         callback(mailBody, summary);
       }
     }

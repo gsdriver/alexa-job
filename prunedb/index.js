@@ -38,7 +38,7 @@ exports.handler = function(event, context, callback) {
 };
 
 function getMailText(callback) {
-  let toRun = 8;
+  let toRun = 10;
   const summary = {};
 
   pruneRecords('PlayBlackjack', 'userId', 'mapAttr', summary, (err) => {
@@ -63,6 +63,12 @@ function getMailText(callback) {
     completed();
   });
   pruneRecords('BlackjackParty', 'id', 'attributes', summary, (err) => {
+    completed();
+  });
+  pruneRecords('CrapsParty', 'id', 'attributes', summary, (err) => {
+    completed();
+  });
+  pruneRecords('ThreeCardPoker', 'id', 'attributes', summary, (err) => {
     completed();
   });
 
