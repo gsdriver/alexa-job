@@ -62,7 +62,7 @@ readFiles(contentDir, (err, results) => {
     console.log(err);
   } else {
     // Now go through each result and write to a CSV file
-    let text = 'Date,Action,Selection,Response,Token,userId\n';
+    let text = 'Date,Action,Selection,Response,Product,userId\n';
 
     results.forEach((result) => {
       text += getFormattedDate(result.timestamp);
@@ -80,7 +80,8 @@ readFiles(contentDir, (err, results) => {
       }
       text += ',';
       if (result.token !== undefined) {
-        text += result.token;
+        const segments = result.token.split('.');
+        text += segments[1];
       }
       text += ',';
       if (result.userId !== undefined) {
