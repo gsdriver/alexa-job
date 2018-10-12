@@ -24,17 +24,20 @@ function listNames(callback) {
       console.log('Error processing data: ' + err);
     } else {
       const names = {};
+      const timedNames = {};
 
       results.forEach((result) => {
         result.hands.forEach((hand) => {
-          if (names[hand.name]) {
-            names[hand.name]++;
-          } else {
-            names[hand.name] = 1;
+          names[hand.name] = (names[hand.name] + 1) || 1;
+          if (hand.timestamp) {
+            timedNames[hand.name] = (timedNames[hand.name] + 1) || 1;
           }
         });
       });
 
+      console.log('WITH TIMESTAMPS:');
+      console.log(timedNames);
+      console.log('\nALL:');
       console.log(names);
     }
     callback();
