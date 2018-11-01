@@ -330,6 +330,8 @@ function getSlotsMail(previousDay, callback) {
         (lastRun.players) ? lastRun.players['en-IN'] : undefined)));
       rows.push(getSummaryTableRow('Australian Players', deltaValue(players['en-AU'],
         (lastRun.players) ? lastRun.players['en-AU'] : undefined)));
+      rows.push(getSummaryTableRow('German Players', deltaValue(players['de-DE'],
+        (lastRun.players) ? lastRun.players['de-DE'] : undefined)));
 
       rows.push(getSummaryTableRow('Google Players', deltaValue(googlePlayers, lastRun.googlePlayers)));
       rows.push(getSummaryTableRow('Google Users Who Haven\'t Played', deltaValue(googleNonPlayers, lastRun.googleNonPlayers)));

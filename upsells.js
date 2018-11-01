@@ -62,7 +62,7 @@ readFiles(contentDir, (err, results) => {
     console.log(err);
   } else {
     // Now go through each result and write to a CSV file
-    let text = 'Date,Action,Selection,Response,Product,userId\n';
+    let text = 'Date,Action,Selection,Response,Product,Action,userId\n';
 
     results.sort((a, b) => (a.timestamp - b.timestamp));
     results.forEach((result) => {
@@ -82,7 +82,9 @@ readFiles(contentDir, (err, results) => {
       text += ',';
       if (result.token !== undefined) {
         const segments = result.token.split('.');
-        text += segments[1];
+        text += segments[1] + ',' + segments[2];
+      } else {
+        text += ' , ';
       }
       text += ',';
       if (result.userId !== undefined) {
