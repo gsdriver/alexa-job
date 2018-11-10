@@ -5,35 +5,40 @@
 'use strict';
 
 const fs = require('fs');
-const contentDir = 'content/slots-upsell';
+const dirnames = ['content/slots-upsell', 'content/blackjack-upsell'];
 const csvFile = 'upsell-prompts.csv';
 
 // Read every file from the content directory
-function readFiles(dirname, callback) {
+function readFiles(callback) {
   const results = [];
+  let dirCount = dirnames.length;
 
-  fs.readdir(dirname, (err, filenames) => {
-    if (err) {
-      callback(err, null);
-    } else {
-      let fileCount = filenames.length;
+  dirnames.forEach((dirname) => {
+    fs.readdir(dirname, (err, filenames) => {
+      if (err) {
+        callback(err, null);
+      } else {
+        let fileCount = filenames.length;
 
-      filenames.forEach((filename) => {
-        fs.readFile(dirname + '/' + filename, 'utf-8', function(err, content) {
-          const timestamp = parseInt(this.filename.replace('.txt', ''));
-          if (err) {
-            callback(err, null);
-          } else {
-            const result = JSON.parse(content);
-            result.timestamp = timestamp;
-            results.push(result);
-            if (--fileCount === 0) {
-              callback(null, results);
+        filenames.forEach((filename) => {
+          fs.readFile(dirname + '/' + filename, 'utf-8', function(err, content) {
+            const timestamp = parseInt(this.filename.replace('.txt', ''));
+            if (err) {
+              callback(err, null);
+            } else {
+              const result = JSON.parse(content);
+              result.timestamp = timestamp;
+              results.push(result);
+              if (--fileCount === 0) {
+                if (--dirCount === 0) {
+                  callback(null, results);
+                }
+              }
             }
-          }
-        }.bind({filename: filename}));
-      });
-    }
+          }.bind({filename: filename}));
+        });
+      }
+    });
   });
 }
 
@@ -57,7 +62,7 @@ if (fs.existsSync(csvFile)) {
 }
 
 // Read files and write to a CSV file
-readFiles(contentDir, (err, results) => {
+readFiles((err, results) => {
   if (err) {
     console.log(err);
   } else {
