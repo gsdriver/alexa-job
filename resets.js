@@ -7,6 +7,7 @@ const doc = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 
 let numCalls = 1;
 const resets = [];
+const germans = [];
 
 processDBEntries('RouletteWheel',
   (item) => {
@@ -24,10 +25,31 @@ processDBEntries('RouletteWheel',
         + (attributes.european.resets ? attributes.european.resets : 0);
       resets.push(text);
     }
+    if (attributes.playerLocale === 'de-DE') {
+      // extra stats for German play
+      let german = '';
+      german += item.userId + ',';
+      german += (attributes.sessions) ? attributes.sessions : 0;
+      german += ',';
+      german += (attributes.american && attributes.american.spins) ? attributes.american.spins : 0;
+      german += ','
+      german += (attributes.european && attributes.european.spins) ? attributes.european.spins : 0;
+      german += ','
+      german += (attributes.usedButton) ? 'button' : 'no button';
+      german += ',';
+      german += (attributes.european.timestamp) ? attributes.european.timestamp : '';
+      germans.push(german);
+    }
   },
   (err, results) => {
     if (--numCalls === 0) {
+      let text = '';
+      germans.forEach((line) => {
+        text += line + '\n';
+      });
+      fs.writeFile('germans.csv', text, () => {
       completed();
+      });
     }
 });
 
