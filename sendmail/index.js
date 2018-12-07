@@ -255,6 +255,8 @@ function getSlotsMail(previousDay, callback) {
   let googlePlayers = 0;
   let googleNonPlayers = 0;
   let buttonUsers = 0;
+  let reminderUsers = 0;
+  let namedUsers = 0;
 
   processDBEntries('Slots', 'mapAttr',
     (attributes) => {
@@ -291,6 +293,12 @@ function getSlotsMail(previousDay, callback) {
       if (attributes.usedButton) {
         buttonUsers++;
       }
+      if (attributes.setReminder) {
+        reminderUsers++;
+      }
+      if (attributes.given_name) {
+        namedUsers++;
+      }
     },
     (err, results) => {
     if (err) {
@@ -309,6 +317,8 @@ function getSlotsMail(previousDay, callback) {
       details.buttonUsers = buttonUsers;
       details.googlePlayers = googlePlayers;
       details.googleNonPlayers = googleNonPlayers;
+      details.reminderUsers = reminderUsers;
+      details.namedUsers = namedUsers;
 
       rows.push(getSummaryTableRow('Total Players', deltaValue(totalPlayers, lastRun.totalPlayers)));
       rows.push(getSummaryTableRow('Past 24 Hours (Alexa)', deltaValue(recentAlexaPlayers, lastRun.recentAlexaPlayers),
@@ -336,6 +346,8 @@ function getSlotsMail(previousDay, callback) {
       rows.push(getSummaryTableRow('Google Players', deltaValue(googlePlayers, lastRun.googlePlayers)));
       rows.push(getSummaryTableRow('Google Users Who Haven\'t Played', deltaValue(googleNonPlayers, lastRun.googleNonPlayers)));
       rows.push(getSummaryTableRow('Button Users', deltaValue(buttonUsers, lastRun.buttonUsers)));
+      rows.push(getSummaryTableRow('Reminder Users', deltaValue(reminderUsers, lastRun.reminderUsers)));
+      rows.push(getSummaryTableRow('Named Users', deltaValue(namedUsers, lastRun.namedUsers)));
       rows.push(getSummaryTableRow('Display Devices', deltaValue(displayDevices, lastRun.displayDevices)));
       text = getSummaryTable('SLOT MACHINE', rows);
       text += getAdText(adsPlayed);
